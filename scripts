@@ -1,0 +1,234 @@
+
+############################################################
+# Strip internal fallback suffixes (-too_small, -2, -6, etc)
+############################################################
+[remove_sourcetype_suffix]
+REGEX = ^(.+?)(?:-(?:too_small|\d+))$
+FORMAT = sourcetype::$1
+DEST_KEY = MetaData:Sourcetype
+
+[identity]
+REGEX = .
+DEST_KEY = queue
+FORMAT = indexQueue
+
+########################################
+# REMOVE NUMERIC SUFFIXES
+########################################
+[strip_numeric_suffix]
+REGEX = ^(.*)-\d+$
+FORMAT = sourcetype::$1
+DEST_KEY = MetaData:Sourcetype
+
+########################################
+# REMOVE -too_small
+########################################
+[strip_toosmall_suffix]
+REGEX = ^(.*)-too_small$
+FORMAT = sourcetype::$1
+DEST_KEY = MetaData:Sourcetype
+
+########################################
+# FORCE DEFINITIONS
+########################################
+[force_dnf]
+REGEX = .
+FORMAT = sourcetype::dnf
+DEST_KEY = MetaData:Sourcetype
+
+[force_cloudwatch]
+REGEX = .
+FORMAT = sourcetype::aws_cloudwatch_agent
+DEST_KEY = MetaData:Sourcetype
+
+[force_cloud_init]
+REGEX = .
+FORMAT = sourcetype::cloud_init
+DEST_KEY = MetaData:Sourcetype
+
+[force_cloud_init_output]
+REGEX = .
+FORMAT = sourcetype::cloud_init_output
+DEST_KEY = MetaData:Sourcetype
+
+[force_jstack]
+REGEX = .
+FORMAT = sourcetype::jstack
+DEST_KEY = MetaData:Sourcetype
+
+[force_instance_state]
+REGEX = .
+FORMAT = sourcetype::emr_instance_state
+DEST_KEY = MetaData:Sourcetype
+
+[force_traps]
+REGEX = .
+FORMAT = sourcetype::trapsd
+DEST_KEY = MetaData:Sourcetype
+
+PROPS.CONF
+############################################################
+# Strip internal fallback suffixes (-too_small, -2, -6, etc)
+############################################################
+[remove_sourcetype_suffix]
+REGEX = ^(.+?)(?:-(?:too_small|\d+))$
+FORMAT = sourcetype::$1
+DEST_KEY = MetaData:Sourcetype
+
+[root@pl-bnaaesplds01 local]# ll
+total 12
+-rw-------. 1 splunk splunk   21 Apr 21 18:30 app.conf
+-rw-------. 1 splunk splunk 1854 Apr 20 19:20 props.conf
+-rw-------. 1 splunk splunk  305 Apr 20 19:20 transforms.conf
+[root@pl-bnaaesplds01 local]# cat props.conf
+############################################################
+# Global parsing safety – force deterministic behavior
+############################################################
+[default]
+SHOULD_LINEMERGE = false
+BREAK_ONLY_BEFORE_DATE = false
+MAX_EVENTS = 10000
+TRUNCATE = 200000
+CHARSET = UTF-8
+
+
+############################################################
+# Enforce clean sourcetypes everywhere
+############################################################
+[host::*]
+TRANSFORMS-fix_sourcetype = remove_sourcetype_suffix
+
+############################################################
+# /var/log family – timing-safe
+############################################################
+[source::/var/log/*]
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+MAX_DAYS_AGO = 3650
+MAX_DAYS_HENCE = 365
+
+
+
+############################################################
+# Heavy Java / JVM logs
+############################################################
+[sourcetype::log4j]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+
+[source::/u01/app/oracle/**/trace/*.trc]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+
+[source::/var/log/hadoop-*/*.log]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+
+[source::/var/log/trino/*.log]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+
+
+
+###########################################################
+# Instance-state and jstack (always pathological)
+############################################################
+[source::/var/log/instance-state/*]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+MAX_DIFF_SECS_AGO = 31536000
+
+[source::/var/log/instance-state/jstack*]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+
+
+##########################################################
+# Massive SOAP payloads
+############################################################
+[sourcetype::mcds_soap]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+MAX_EVENTS = 20000
+
+
+############################################################
+# Global parsing safety – force deterministic behavior
+############################################################
+[source::...]
+SHOULD_LINEMERGE = false
+BREAK_ONLY_BEFORE_DATE = false
+MAX_EVENTS = 10000
+TRUNCATE = 200000
+CHARSET = UTF-8
+LINE_BREAKER = ([\r\n]+)
+
+############################################################
+# Enforce clean sourcetypes everywhere
+############################################################
+[host::*]
+TRANSFORMS-fix_sourcetype = remove_sourcetype_suffix
+
+############################################################
+# /var/log family – timing-safe
+############################################################
+[source::/var/log/*]
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+MAX_DAYS_AGO = 3650
+MAX_DAYS_HENCE = 365
+
+splunk btool outputs list --debug
+
+############################################################
+# Heavy Java / JVM logs
+############################################################
+[source::/u01/app/oracle/**/trace/*.trc]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+
+[source::/var/log/hadoop-*/*.log]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+
+[source::/var/log/trino/*.log]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+
+
+[sourcetype::log4j]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+(?=\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2}|INFO|WARN|ERROR|DEBUG|TRACE|Caused by:|Exception))
+MAX_EVENTS = 1024
+TRUNCATE = 200000
+TIME_PREFIX = ^
+MAX_TIMESTAMP_LOOKAHEAD = 128
+MAX_DAYS_AGO = 36500
+MAX_DAYS_HENCE = 36500
+###########################################################
+# Instance-state and jstack (always pathological)
+############################################################
+[source::/var/log/instance-state/*]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+MAX_DIFF_SECS_AGO = 31536000
+
+[source::/var/log/instance-state/jstack*]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+
+
+##########################################################
+# Massive SOAP payloads
+############################################################
+[sourcetype::mcds_soap]
+SHOULD_LINEMERGE = false
+TRUNCATE = 200000
+MAX_EVENTS = 20000
+
+Limits.CONF
+[aggregation]
+max_mem_usage_mb = 512
+
+[search]
+max_rawsize_perchunk = 0
