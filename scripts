@@ -1,181 +1,321 @@
 ############################################################
-# Core security and system logs
+# Global parsing safety - deterministic event breaking
 ############################################################
-# auditd security events - process, auth, file, network, daemon events
-[monitor:///var/log/audit/audit.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux_audit
-ignoreOlderThan = 30d
-
-# Debian/Ubuntu authentication, SSH, PAM, sudo, su
-[monitor:///var/log/auth.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = syslog
-ignoreOlderThan = 30d
-
-# RHEL/CentOS authentication, SSH, PAM, sudo, su
-[monitor:///var/log/secure]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = syslog
-ignoreOlderThan = 30d
-
-# dedicated sudo command log if configured
-[monitor:///var/log/sudo.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = syslog
-ignoreOlderThan = 30d
-
-# cron job execution and failures
-[monitor:///var/log/cron]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = syslog
-ignoreOlderThan = 30d
-
-# general Linux syslog/systemd/iptables/AppArmor/firewalld/fail2ban fallback
-[monitor:///var/log/syslog]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
-# kernel, dmesg, firewall, OOM, module, integrity events
-[monitor:///var/log/kern.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
-# kernel boot/dmesg events
-[monitor:///var/log/dmesg]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
-# chrony/NTP time sync logs; use directory monitor when chrony writes multiple files
-[monitor:///var/log/chrony]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
-# AIDE file integrity monitoring output
-[monitor:///var/log/aide/aide.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
-# fail2ban ban/unban/bruteforce indicators
-[monitor:///var/log/fail2ban.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
-# BIND/named DNS query logs
-[monitor:///var/log/named/queries.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
-# nginx HTTP access log
-[monitor:///var/log/nginx/access.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = access_combined
-ignoreOlderThan = 30d
-
-# Apache HTTP access log
-[monitor:///var/log/apache2/access.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = access_combined
-ignoreOlderThan = 30d
-
-# nginx error log
-[monitor:///var/log/nginx/error.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
-# Apache error log
-[monitor:///var/log/apache2/error.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
-# Docker daemon log if written to file
-[monitor:///var/log/docker.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
+[default]
+SHOULD_LINEMERGE = false
+BREAK_ONLY_BEFORE_DATE = false
+LINE_BREAKER = ([\r\n]+)
+MAX_EVENTS = 10000
+TRUNCATE = 200000
+CHARSET = UTF-8
+MAX_TIMESTAMP_LOOKAHEAD = 256
+MAX_DAYS_AGO = 3650
+MAX_DAYS_HENCE = 365
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+TZ = UTC
 
 ############################################################
-# Optional common Linux paths - enable only where present
+# Enforce clean sourcetypes everywhere
+# Requires transforms.conf stanza: [remove_sourcetype_suffix]
 ############################################################
-# Optional RHEL general syslog equivalent; not explicitly listed in workbook but commonly paired syslog
-[monitor:///var/log/messages]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
-# Optional RHEL Apache access log path
-[monitor:///var/log/httpd/access_log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = access_combined
-ignoreOlderThan = 30d
-
-# Optional RHEL Apache error log path
-[monitor:///var/log/httpd/error_log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
-# ulogd iptables/nftables userspace firewall log
-[monitor:///var/log/ulog/syslogemu.log]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
-
-# Tripwire file integrity log
-[monitor:///var/log/tripwire/twlog.txt]
-disabled = 0
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
-
+[host::*]
+TRANSFORMS-fix_suffixes = strip_numeric_suffix, strip_toosmall_suffix
 
 ############################################################
-# Optional disabled monitors - enable only after host/path validation
+# /var/log family - timing-safe baseline
 ############################################################
+[source::/var/log/*]
+SHOULD_LINEMERGE = false
+BREAK_ONLY_BEFORE_DATE = false
+LINE_BREAKER = ([\r\n]+)
+TRUNCATE = 200000
+MAX_EVENTS = 10000
+MAX_TIMESTAMP_LOOKAHEAD = 256
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+MAX_DAYS_AGO = 3650
+MAX_DAYS_HENCE = 365
 
-# Auditbeat output directory if locally written as text/JSON; verify before enabling
-[monitor:///var/log/auditbeat/...]
-disabled = 1
-index = sec_os_uhgid-000024
-sourcetype = linux_audit
-ignoreOlderThan = 30d
+############################################################
+# Cloud-init logs - frequent timestamp parse failures
+############################################################
+[source::/var/log/cloud-init.log]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+TIME_PREFIX = ^
+TIME_FORMAT = %Y-%m-%d %H:%M:%S
+MAX_TIMESTAMP_LOOKAHEAD = 64
+TRUNCATE = 200000
 
-# Kubernetes container logs can be very high volume; prefer k8s-specific collection/sourcetypes
-[monitor:///var/log/containers/...]
-disabled = 1
-index = sec_os_uhgid-000024
-sourcetype = linux:syslog
-ignoreOlderThan = 30d
+[source::/var/log/cloud-init-output.log]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+TIME_PREFIX = ^
+TIME_FORMAT = %Y-%m-%d %H:%M:%S
+MAX_TIMESTAMP_LOOKAHEAD = 64
+TRUNCATE = 200000
 
+############################################################
+# Heavy Java / JVM / application logs
+############################################################
+[sourcetype::log4j]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+(?=\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2}|INFO|WARN|ERROR|DEBUG|TRACE|Caused by:|Exception))
+MAX_EVENTS = 1024
+TRUNCATE = 200000
+TIME_PREFIX = ^
+MAX_TIMESTAMP_LOOKAHEAD = 128
+MAX_DAYS_AGO = 3650
+MAX_DAYS_HENCE = 365
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+
+[source::/u01/app/oracle/.../trace/*.trc]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+TRUNCATE = 200000
+MAX_EVENTS = 10000
+MAX_TIMESTAMP_LOOKAHEAD = 256
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+
+[source::/var/log/hadoop-*/*.log]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+TRUNCATE = 200000
+MAX_EVENTS = 10000
+MAX_TIMESTAMP_LOOKAHEAD = 256
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+
+[source::/var/log/trino/*.log]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+TRUNCATE = 200000
+MAX_EVENTS = 10000
+MAX_TIMESTAMP_LOOKAHEAD = 256
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+
+############################################################
+# Instance-state and jstack - pathological / large events
+############################################################
+[source::/var/log/instance-state/*]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+TRUNCATE = 200000
+MAX_EVENTS = 20000
+MAX_TIMESTAMP_LOOKAHEAD = 256
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+MAX_DAYS_AGO = 3650
+MAX_DAYS_HENCE = 365
+
+[source::/var/log/instance-state/jstack*]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+TRUNCATE = 200000
+MAX_EVENTS = 20000
+MAX_TIMESTAMP_LOOKAHEAD = 256
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+
+############################################################
+# Massive SOAP payloads
+############################################################
+[sourcetype::mcds_soap]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+TRUNCATE = 200000
+MAX_EVENTS = 20000
+MAX_TIMESTAMP_LOOKAHEAD = 256
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+MAX_DAYS_AGO = 3650
+MAX_DAYS_HENCE = 365
+
+[source::E:\\SoapServer\\logs\\*.log]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+MAX_EVENTS = 1024
+TRUNCATE = 200000
+
+############################################################
+# Generic large JSON / audit payloads
+# Apply these sourcetypes only if they exist in your environment.
+############################################################
+[aws:firehose:json]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+INDEXED_EXTRACTIONS = json
+KV_MODE = none
+TRUNCATE = 0
+TIME_PREFIX = "(?:time|timestamp|eventTime)"\s*:\s*"
+TIME_FORMAT = %Y-%m-%dT%H:%M:%S.%3N%z
+MAX_TIMESTAMP_LOOKAHEAD = 128
+MAX_DAYS_AGO = 3650
+MAX_DAYS_HENCE = 365
+TZ = UTC
+
+[source::/var/log/dnf.log]
+TIME_PREFIX = ^
+TIME_FORMAT = %a %b %d %H:%M:%S %Y
+MAX_TIMESTAMP_LOOKAHEAD = 32
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+TRANSFORMS-force = force_dnf
+
+[source::/var/log/amazon/amazon-cloudwatch-agent/*]
+TRANSFORMS-force = force_cloudwatch
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+MAX_EVENTS = 1000
+TRUNCATE = 200000
+
+[source::/var/log/cloud-init.log]
+TRANSFORMS-force = force_cloud_init
+
+[source::/var/log/cloud-init-output.log]
+TRANSFORMS-force = force_cloud_init_output
+
+[source::/var/log/instance-state/jstack.log*]
+TRANSFORMS-force = force_jstack
+
+[source::/var/log/instance-state/*]
+TRANSFORMS-force = force_instance_state
+
+[source::/var/log/traps/*]
+TRANSFORMS-force = force_traps
+
+[source::*_gc.log]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+MAX_EVENTS = 4096
+TRUNCATE = 300000
+
+########################################################################
+# restore / maintenance style logs – very infrequent
+########################################################################
+[source::/var/log/restore-runners.log]
+TIME_PREFIX = ^
+TIME_FORMAT = %Y-%m-%d %H:%M:%S
+MAX_TIMESTAMP_LOOKAHEAD = 32
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+
+########################################################################
+# maillog – sparse, bursty, classic source of -too_small
+########################################################################
+[source::/var/log/maillog]
+TIME_PREFIX = ^
+TIME_FORMAT = %b %d %H:%M:%S
+MAX_TIMESTAMP_LOOKAHEAD = 64
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+
+########################################################################
+# cron – low frequency, long gaps
+########################################################################
+[source::/var/log/cron]
+TIME_PREFIX = ^
+TIME_FORMAT = %b %d %H:%M:%S
+MAX_TIMESTAMP_LOOKAHEAD = 64
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+
+########################################################################
+# Dynatrace OneAgent – agent logs with headers and gaps
+########################################################################
+[source::/var/log/dynatrace/oneagent/*]
+TIME_PREFIX = ^
+TIME_FORMAT = %Y-%m-%d %H:%M:%S
+MAX_TIMESTAMP_LOOKAHEAD = 64
+MAX_DIFF_SECS_AGO = 31536000
+MAX_DIFF_SECS_HENCE = 31536000
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+(?=\d{4}-\d{2}-\d{2}|\[\w+\]))
+MAX_EVENTS = 1024
+TRUNCATE = 200000
+
+[snaplogic:log]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+INDEXED_EXTRACTIONS = json
+KV_MODE = none
+TRUNCATE = 0
+TIME_PREFIX = "(?:time|timestamp|date)"\s*:\s*"
+TIME_FORMAT = %Y-%m-%dT%H:%M:%S.%3N%z
+MAX_TIMESTAMP_LOOKAHEAD = 128
+MAX_DAYS_AGO = 3650
+MAX_DAYS_HENCE = 365
+TZ = UTC
+
+[datadog:json]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+INDEXED_EXTRACTIONS = json
+KV_MODE = none
+TRUNCATE = 0
+TIME_PREFIX = "(?:timestamp|date|time)"\s*:\s*"
+TIME_FORMAT = %Y-%m-%dT%H:%M:%S.%3N%z
+MAX_TIMESTAMP_LOOKAHEAD = 128
+MAX_DAYS_AGO = 3650
+MAX_DAYS_HENCE = 365
+TZ = UTC
+
+########################################
+# APP LOGS (log4j style)
+########################################
+[app_log]
+SHOULD_LINEMERGE = true
+BREAK_ONLY_BEFORE = ^\d{4}-\d{2}-\d{2}
+TRUNCATE = 0
+
+[source::*/jcc_status.json]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+MAX_EVENTS = 2000
+TRUNCATE = 250000
+
+[sourcetype::java:*]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+(?=\d{4}-\d{2}-\d{2}|INFO|WARN|ERROR|Caused by:|Exception))
+MAX_EVENTS = 1000
+TRUNCATE = 200000
+
+[sourcetype::log4j]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+(?=\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2}|INFO|WARN|ERROR|DEBUG|TRACE|Caused by:|Exception))
+MAX_EVENTS = 1024
+TRUNCATE = 200000
+TIME_PREFIX = ^
+TIME_FORMAT = %m-%d-%Y %H:%M:%S.%3N %z
+MAX_TIMESTAMP_LOOKAHEAD = 128
+MAX_DAYS_AGO = 36500
+MAX_DAYS_HENCE = 36500
+
+[source::/opt/epsadmin/*]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+(?=\d{2}-\d{2}-\d{4}))
+MAX_EVENTS = 1024
+TRUNCATE = 200000
+
+[source::*/vendorrouter*_gc.log]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+MAX_EVENTS = 2048
+TRUNCATE = 300000
+
+[source::/u01/app/oracle/diag/*/trace/*.trc]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+(?=\w{3}\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4}|\d{2}-\d{2}-\d{4}))
+MAX_EVENTS = 4096
+TRUNCATE = 500000
+TIME_PREFIX = ^
+MAX_TIMESTAMP_LOOKAHEAD = 256
+MAX_DIFF_SECS_AGO = 315360000     # 10 years
+MAX_DIFF_SECS_HENCE = 315360000  # 10 years
+MAX_DAYS_AGO = 36500
+MAX_DAYS_HENCE = 36500
 
