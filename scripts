@@ -1,234 +1,181 @@
+############################################################
+# Core security and system logs
+############################################################
+# auditd security events - process, auth, file, network, daemon events
+[monitor:///var/log/audit/audit.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux_audit
+ignoreOlderThan = 30d
+
+# Debian/Ubuntu authentication, SSH, PAM, sudo, su
+[monitor:///var/log/auth.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = syslog
+ignoreOlderThan = 30d
+
+# RHEL/CentOS authentication, SSH, PAM, sudo, su
+[monitor:///var/log/secure]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = syslog
+ignoreOlderThan = 30d
+
+# dedicated sudo command log if configured
+[monitor:///var/log/sudo.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = syslog
+ignoreOlderThan = 30d
+
+# cron job execution and failures
+[monitor:///var/log/cron]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = syslog
+ignoreOlderThan = 30d
+
+# general Linux syslog/systemd/iptables/AppArmor/firewalld/fail2ban fallback
+[monitor:///var/log/syslog]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
+
+# kernel, dmesg, firewall, OOM, module, integrity events
+[monitor:///var/log/kern.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
+
+# kernel boot/dmesg events
+[monitor:///var/log/dmesg]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
+
+# chrony/NTP time sync logs; use directory monitor when chrony writes multiple files
+[monitor:///var/log/chrony]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
+
+# AIDE file integrity monitoring output
+[monitor:///var/log/aide/aide.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
+
+# fail2ban ban/unban/bruteforce indicators
+[monitor:///var/log/fail2ban.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
+
+# BIND/named DNS query logs
+[monitor:///var/log/named/queries.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
+
+# nginx HTTP access log
+[monitor:///var/log/nginx/access.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = access_combined
+ignoreOlderThan = 30d
+
+# Apache HTTP access log
+[monitor:///var/log/apache2/access.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = access_combined
+ignoreOlderThan = 30d
+
+# nginx error log
+[monitor:///var/log/nginx/error.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
+
+# Apache error log
+[monitor:///var/log/apache2/error.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
+
+# Docker daemon log if written to file
+[monitor:///var/log/docker.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
 
 ############################################################
-# Strip internal fallback suffixes (-too_small, -2, -6, etc)
+# Optional common Linux paths - enable only where present
 ############################################################
-[remove_sourcetype_suffix]
-REGEX = ^(.+?)(?:-(?:too_small|\d+))$
-FORMAT = sourcetype::$1
-DEST_KEY = MetaData:Sourcetype
+# Optional RHEL general syslog equivalent; not explicitly listed in workbook but commonly paired syslog
+[monitor:///var/log/messages]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
 
-[identity]
-REGEX = .
-DEST_KEY = queue
-FORMAT = indexQueue
+# Optional RHEL Apache access log path
+[monitor:///var/log/httpd/access_log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = access_combined
+ignoreOlderThan = 30d
 
-########################################
-# REMOVE NUMERIC SUFFIXES
-########################################
-[strip_numeric_suffix]
-REGEX = ^(.*)-\d+$
-FORMAT = sourcetype::$1
-DEST_KEY = MetaData:Sourcetype
+# Optional RHEL Apache error log path
+[monitor:///var/log/httpd/error_log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
 
-########################################
-# REMOVE -too_small
-########################################
-[strip_toosmall_suffix]
-REGEX = ^(.*)-too_small$
-FORMAT = sourcetype::$1
-DEST_KEY = MetaData:Sourcetype
+# ulogd iptables/nftables userspace firewall log
+[monitor:///var/log/ulog/syslogemu.log]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
 
-########################################
-# FORCE DEFINITIONS
-########################################
-[force_dnf]
-REGEX = .
-FORMAT = sourcetype::dnf
-DEST_KEY = MetaData:Sourcetype
 
-[force_cloudwatch]
-REGEX = .
-FORMAT = sourcetype::aws_cloudwatch_agent
-DEST_KEY = MetaData:Sourcetype
-
-[force_cloud_init]
-REGEX = .
-FORMAT = sourcetype::cloud_init
-DEST_KEY = MetaData:Sourcetype
-
-[force_cloud_init_output]
-REGEX = .
-FORMAT = sourcetype::cloud_init_output
-DEST_KEY = MetaData:Sourcetype
-
-[force_jstack]
-REGEX = .
-FORMAT = sourcetype::jstack
-DEST_KEY = MetaData:Sourcetype
-
-[force_instance_state]
-REGEX = .
-FORMAT = sourcetype::emr_instance_state
-DEST_KEY = MetaData:Sourcetype
-
-[force_traps]
-REGEX = .
-FORMAT = sourcetype::trapsd
-DEST_KEY = MetaData:Sourcetype
-
-PROPS.CONF
-############################################################
-# Strip internal fallback suffixes (-too_small, -2, -6, etc)
-############################################################
-[remove_sourcetype_suffix]
-REGEX = ^(.+?)(?:-(?:too_small|\d+))$
-FORMAT = sourcetype::$1
-DEST_KEY = MetaData:Sourcetype
-
-[root@pl-bnaaesplds01 local]# ll
-total 12
--rw-------. 1 splunk splunk   21 Apr 21 18:30 app.conf
--rw-------. 1 splunk splunk 1854 Apr 20 19:20 props.conf
--rw-------. 1 splunk splunk  305 Apr 20 19:20 transforms.conf
-[root@pl-bnaaesplds01 local]# cat props.conf
-############################################################
-# Global parsing safety – force deterministic behavior
-############################################################
-[default]
-SHOULD_LINEMERGE = false
-BREAK_ONLY_BEFORE_DATE = false
-MAX_EVENTS = 10000
-TRUNCATE = 200000
-CHARSET = UTF-8
+# Tripwire file integrity log
+[monitor:///var/log/tripwire/twlog.txt]
+disabled = 0
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
 
 
 ############################################################
-# Enforce clean sourcetypes everywhere
+# Optional disabled monitors - enable only after host/path validation
 ############################################################
-[host::*]
-TRANSFORMS-fix_sourcetype = remove_sourcetype_suffix
 
-############################################################
-# /var/log family – timing-safe
-############################################################
-[source::/var/log/*]
-MAX_DIFF_SECS_AGO = 31536000
-MAX_DIFF_SECS_HENCE = 31536000
-MAX_DAYS_AGO = 3650
-MAX_DAYS_HENCE = 365
+# Auditbeat output directory if locally written as text/JSON; verify before enabling
+[monitor:///var/log/auditbeat/...]
+disabled = 1
+index = sec_os_uhgid-000024
+sourcetype = linux_audit
+ignoreOlderThan = 30d
 
-
-
-############################################################
-# Heavy Java / JVM logs
-############################################################
-[sourcetype::log4j]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
-
-[source::/u01/app/oracle/**/trace/*.trc]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
-
-[source::/var/log/hadoop-*/*.log]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
-
-[source::/var/log/trino/*.log]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
+# Kubernetes container logs can be very high volume; prefer k8s-specific collection/sourcetypes
+[monitor:///var/log/containers/...]
+disabled = 1
+index = sec_os_uhgid-000024
+sourcetype = linux:syslog
+ignoreOlderThan = 30d
 
 
-
-###########################################################
-# Instance-state and jstack (always pathological)
-############################################################
-[source::/var/log/instance-state/*]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
-MAX_DIFF_SECS_AGO = 31536000
-
-[source::/var/log/instance-state/jstack*]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
-
-
-##########################################################
-# Massive SOAP payloads
-############################################################
-[sourcetype::mcds_soap]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
-MAX_EVENTS = 20000
-
-
-############################################################
-# Global parsing safety – force deterministic behavior
-############################################################
-[source::...]
-SHOULD_LINEMERGE = false
-BREAK_ONLY_BEFORE_DATE = false
-MAX_EVENTS = 10000
-TRUNCATE = 200000
-CHARSET = UTF-8
-LINE_BREAKER = ([\r\n]+)
-
-############################################################
-# Enforce clean sourcetypes everywhere
-############################################################
-[host::*]
-TRANSFORMS-fix_sourcetype = remove_sourcetype_suffix
-
-############################################################
-# /var/log family – timing-safe
-############################################################
-[source::/var/log/*]
-MAX_DIFF_SECS_AGO = 31536000
-MAX_DIFF_SECS_HENCE = 31536000
-MAX_DAYS_AGO = 3650
-MAX_DAYS_HENCE = 365
-
-splunk btool outputs list --debug
-
-############################################################
-# Heavy Java / JVM logs
-############################################################
-[source::/u01/app/oracle/**/trace/*.trc]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
-
-[source::/var/log/hadoop-*/*.log]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
-
-[source::/var/log/trino/*.log]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
-
-
-[sourcetype::log4j]
-SHOULD_LINEMERGE = false
-LINE_BREAKER = ([\r\n]+(?=\d{2}-\d{2}-\d{4}|\d{4}-\d{2}-\d{2}|INFO|WARN|ERROR|DEBUG|TRACE|Caused by:|Exception))
-MAX_EVENTS = 1024
-TRUNCATE = 200000
-TIME_PREFIX = ^
-MAX_TIMESTAMP_LOOKAHEAD = 128
-MAX_DAYS_AGO = 36500
-MAX_DAYS_HENCE = 36500
-###########################################################
-# Instance-state and jstack (always pathological)
-############################################################
-[source::/var/log/instance-state/*]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
-MAX_DIFF_SECS_AGO = 31536000
-
-[source::/var/log/instance-state/jstack*]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
-
-
-##########################################################
-# Massive SOAP payloads
-############################################################
-[sourcetype::mcds_soap]
-SHOULD_LINEMERGE = false
-TRUNCATE = 200000
-MAX_EVENTS = 20000
-
-Limits.CONF
-[aggregation]
-max_mem_usage_mb = 512
-
-[search]
-max_rawsize_perchunk = 0
