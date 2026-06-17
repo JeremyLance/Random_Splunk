@@ -1,4 +1,24 @@
+############################################################
+# Explicit drop bad log cleanup
+# Use only if you want to drop specific source logs
+############################################################
+[drop_events]
+REGEX = .
+DEST_KEY = queue
+FORMAT = nullQueue
+
+
 ########################################################
+# FIX / NORMALIZE SOURCETYPE
+########################################################
+[fix_bad_sourcetype]
+
+# Strips -2, -7, -too_small, timestamps, etc
+REGEX = ^([^-\s]+(?:-[^-\s]+)*?)(?:-\d+|-too_small.*)?$
+DEST_KEY = MetaData:Sourcetype
+FORMAT = sourcetype::$1
+
+############################################################
 # SYSLOG HEADER
 ########################################################
 
