@@ -1,99 +1,81 @@
 ########################################################
 # LINUX SYSLOG (primary for most /var/log files)
 ########################################################
+[source::...]
+TRANSFORMS-01-clean = fix_bad_sourcetype
+
+[source::/var/log/*]
+TRANSFORMS-01-clean = fix_bad_sourcetype
+
+[source::/var/log/cron]
+TRANSFORMS-01-clean = fix_bad_sourcetype
 
 [linux:syslog]
-
 SHOULD_LINEMERGE = false
-
 # Break on syslog timestamps only
 LINE_BREAKER = ([\r\n]+)(?=\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})
-
 TRUNCATE = 200000
 MAX_EVENTS = 10000
-
 TIME_PREFIX = ^
 TIME_FORMAT = %b %d %H:%M:%S
 MAX_TIMESTAMP_LOOKAHEAD = 20
-
 MAX_DIFF_SECS_AGO = 31536000
 MAX_DIFF_SECS_HENCE = 31536000
-
 KV_MODE = auto
-
 REPORT-syslog_header = linux_syslog_header
-
+TRANSFORMS-01-clean = fix_bad_sourcetype
 
 ########################################################
 # LINUX AUDIT (auditd logs)
 ########################################################
 
 [linux_audit]
-
 SHOULD_LINEMERGE = false
-
 # Each audit event starts with "type="
 LINE_BREAKER = ([\r\n]+)(?=type=)
-
 TRUNCATE = 200000
 MAX_EVENTS = 10000
-
 # Extract epoch timestamp from msg=audit(...)
 TIME_PREFIX = msg=audit\(
 TIME_FORMAT = %s
 MAX_TIMESTAMP_LOOKAHEAD = 20
-
 KV_MODE = auto
-
 REPORT-audit_header = linux_audit_header
-
+TRANSFORMS-01-clean = fix_bad_sourcetype
 
 ########################################################
 # LINUX AIDE (file integrity logs)
 ########################################################
 
 [linux:aide]
-
 SHOULD_LINEMERGE = false
-
 # Break on timestamp (even if no newline exists)
 LINE_BREAKER = ([\r\n]*)(?=\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2}\.\d{3})
-
 TRUNCATE = 200000
 MAX_EVENTS = 10000
-
 TIME_PREFIX = ^
 TIME_FORMAT = %m-%d-%Y %H:%M:%S.%3N %z
 MAX_TIMESTAMP_LOOKAHEAD = 30
-
 MAX_DIFF_SECS_AGO = 31536000
 MAX_DIFF_SECS_HENCE = 31536000
-
 KV_MODE = auto
-
 REPORT-aide_fields = linux_aide_fields
-
+TRANSFORMS-01-clean = fix_bad_sourcetype
 
 ########################################################
 # HTTP ACCESS LOGS (nginx/apache)
 ########################################################
 
 [access_combined]
-
 SHOULD_LINEMERGE = false
-
 LINE_BREAKER = ([\r\n]+)
-
 TRUNCATE = 200000
-
 TIME_PREFIX = \[
 TIME_FORMAT = %d/%b/%Y:%H:%M:%S %z
 MAX_TIMESTAMP_LOOKAHEAD = 30
-
 KV_MODE = none
-
 REPORT-access = linux_access_combined
-
+TRANSFORMS-01-clean = fix_bad_sourcetype
 
 ########################################################
 # SAFETY NET (optional but controlled)
@@ -113,3 +95,101 @@ MAX_DIFF_SECS_AGO = 31536000
 MAX_DIFF_SECS_HENCE = 31536000
 MAX_DAYS_AGO = 3650
 MAX_DAYS_HENCE = 365
+TRANSFORMS-01-clean = fix_bad_sourcetype
+
+########################################################
+# DROP BAD / ROGUE SOURCETYPES
+########################################################
+
+[sourcetype::*too_small*]
+TRANSFORMS-02-drop = drop_events
+
+[sourcetype::oneagent*]
+TRANSFORMS-02-drop = drop_events
+
+[sourcetype::dynatrace*]
+TRANSFORMS-02-drop = drop_events
+
+[sourcetype::ruxitagent*]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/trino/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/amazon/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/dynatrace/...]
+TRANSFORMS-02-drop = drop_events
+
+[sourcetype::vmware-vm*]
+TRANSFORMS-02-drop = drop_events
+
+[sourcetype::oraasmaudit]
+TRANSFORMS-02-drop = drop_events
+
+[sourcetype::vmware-vg*]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/sssd/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/instance-state/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/dnf*]
+TRANSFORMS-02-drop = drop_events
+
+[sourcetype::EIL*]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/EIL*]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/tmp/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/rhsm/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/adfapi/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/hadoop-*/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/hdxapi/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/ecs/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/ebx/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/ecdw/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/rundeck/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/covapi/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/hive*/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/httpd/...]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/restore-runners*]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/casnt*]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/cloud-init*]
+TRANSFORMS-02-drop = drop_events
+
+[source::/var/log/commvault*]
+TRANSFORMS-02-drop = drop_events
