@@ -14,7 +14,7 @@ FORMAT = nullQueue
 [fix_bad_sourcetype]
 
 # Strips -2, -7, -too_small, timestamps, etc
-REGEX = ^([^-\s]+(?:-[^-\s]+)*?)(?:-\d+|-too_small.*)?$
+REGEX = ^([^-\s]+(?:-[^-\s]+)*?)(?:-\d+|-too_small.*|-20\d{2}.*)?$
 DEST_KEY = MetaData:Sourcetype
 FORMAT = sourcetype::$1
 
@@ -48,3 +48,11 @@ REGEX = ^(?<aide_time>\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+[+-]\d{4})\
 
 [linux_access_combined]
 REGEX = ^(?<client_ip>\S+)\s+\S+\s+\S+\s+\[(?<time>[^\]]+)\]\s+"(?<method>\S+)\s+(?<uri>\S+)\s*(?<http_version>[^\"]*)"\s+(?<status>\d+)\s+(?<bytes>\d+)
+
+[set_linux_sourcetype]
+DEST_KEY = MetaData:Sourcetype
+FORMAT = sourcetype::linux:syslog
+
+[set_index]
+DEST_KEY = _MetaData:Index
+FORMAT = sec_os_uhgid-000024
