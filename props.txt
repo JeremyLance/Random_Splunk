@@ -76,11 +76,34 @@ REPORT-access = linux_access_combined
 
 [aix:syslog]
 TRANSFORMS-normalize = set_linux_sourcetype, set_index
+
+[source::/var/log/audit/audit.log]
+TRANSFORMS-routing = set_audit_sourcetype, set_audit_index
+
+########################################################
+# GLOBAL ENFORCEMENT (HF POLICY LAYER)
+########################################################
+
+[source::*]
+
+# Step 0 - normalize bad sourcetypes
+TRANSFORMS-00-normalize = fix_bad_sourcetype
+
+# Step 1 - enforce approved sources (sourcetype + index)
+TRANSFORMS-01-enforce = force_audit_sourcetype, force_audit_index, force_syslog_sourcetype, force_syslog_index, force_nginx_access_sourcetype, force_nginx_error_sourcetype, force_nginx_index, force_sudo_sourcetype, force_sudo_index
+
+# Step 2 - optional safety net (ensures index always set)
+TRANSFORMS-98-index_safety = force_generic_linux_index
+
+# Step 3 - drop everything not explicitly allowed
+TRANSFORMS-99-drop = drop_events
+
+
 ########################################################
 # DROP BAD / ROGUE SOURCETYPES
 ########################################################
 
-[source::...]
+[source::*]
 TRANSFORMS-01-clean = fix_bad_sourcetype
 
 [sourcetype::*too_small*]
@@ -95,13 +118,13 @@ TRANSFORMS-02-drop = drop_events
 [sourcetype::ruxitagent*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../trino/...]
+[source::*trino*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../amazon/...]
+[source::*amazon*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../dynatrace/...]
+[source::*dynatrace*]
 TRANSFORMS-02-drop = drop_events
 
 [sourcetype::vmware-vm*]
@@ -113,10 +136,10 @@ TRANSFORMS-02-drop = drop_events
 [sourcetype::vmware-vg*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../sssd/...]
+[source::*sssd*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../instance-state/...]
+[source::*instance-state*]
 TRANSFORMS-02-drop = drop_events
 
 [source::/var/log/dnf*]
@@ -128,40 +151,40 @@ TRANSFORMS-02-drop = drop_events
 [source::/var/log/EIL*]
 TRANSFORMS-02-drop = drop_events
 
-[source::/var/log/tmp/...]
+[source::/var/log/tmp*]
 TRANSFORMS-02-drop = drop_events
 
-[source::/var/log/rhsm/...]
+[source::/var/log/rhsm*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../adfapi/...]
+[source::*adfapi*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../hadoop-*/...]
+[source::*hadoop-*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../hdxapi/...]
+[source::*hdxapi*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../ecs/...]
+[source::*ecs*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../ebx/...]
+[source::*ebx*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../ecdw/...]
+[source::*ecdw*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../rundeck/...]
+[source::*rundeck*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../covapi/...]
+[source::*covapi*]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../hive*/...]
+[source::*hive**]
 TRANSFORMS-02-drop = drop_events
 
-[source::.../httpd/...]
+[source::*httpd*]
 TRANSFORMS-02-drop = drop_events
 
 [sourcetype::launcher*]
