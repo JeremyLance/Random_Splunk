@@ -1,6 +1,5 @@
 ############################################################
-# Explicit drop bad log cleanup
-# Use only if you want to drop specific source logs
+# DROP EVERYTHING NOT EXPLICITLY CORRECTED
 ############################################################
 [drop_events]
 REGEX = .
@@ -9,50 +8,105 @@ FORMAT = nullQueue
 
 
 ########################################################
-# FIX / NORMALIZE SOURCETYPE
+# GLOBAL SOURCETYPE NORMALIZATION (KEEP EXISTING)
 ########################################################
 [fix_bad_sourcetype]
-
 # Strips -2, -7, -too_small, timestamps, etc
 REGEX = ^([^-\s]+(?:-[^-\s]+)*?)(?:-\d+|-too_small.*|-20\d{2}.*)?$
 DEST_KEY = MetaData:Sourcetype
 FORMAT = sourcetype::$1
 
-############################################################
-# SYSLOG HEADER
+
 ########################################################
+# ====== SOURCE-BASED ENFORCEMENT RULES ======
+# These OVERRIDE bad metadata (sourcetype + index)
+########################################################
+
+##############################
+# AUDIT LOGS (handles rotation)
+##############################
+[force_audit_sourcetype]
+REGEX = /var/log/audit/audit/.log(\.\d+)?
+DEST_KEY = MetaData:Sourcetype
+FORMAT = sourcetype::linux_audit
+WRITE_META = true
+
+[force_audit_index]
+REGEX = /var/log/audit/audit/.log(\.\d+)?
+DEST_KEY = _MetaData:Index
+FORMAT = sec_os_uhgid-000024
+
+
+##############################
+# SYSLOG FAMILY
+##############################
+[force_syslog_sourcetype]
+REGEX = /var/log/(secure|messages|cron|syslog|kern\*.log$)
+DEST_KEY = MetaData:Sourcetype
+FORMAT = sourcetype::linux:syslog
+WRITE_META = true
+
+[force_syslog_index]
+REGEX = /var/log/(secure|messages|cron|syslog|kern\*.log$)
+DEST_KEY = _MetaData:Index
+FORMAT = sec_os_uhgid-000024
+
+
+##############################
+# NGINX
+##############################
+[force_nginx_access_sourcetype]
+REGEX = /var/log/nginx/access\*.log$
+DEST_KEY = MetaData:Sourcetype
+FORMAT = sourcetype::access_combined
+
+[force_nginx_error_sourcetype]
+REGEX = /var/log/nginx/error\*.log$
+DEST_KEY = MetaData:Sourcetype
+FORMAT = sourcetype::linux:syslog
+
+[force_nginx_index]
+REGEX = /var/log/nginx/(access|error)\*.log$
+DEST_KEY = _MetaData:Index
+FORMAT = sec_weblogs_uhgid-000024
+
+
+##############################
+# SUDO LOG
+##############################
+[force_sudo_sourcetype]
+REGEX = /var/log/sudo\*.log$
+DEST_KEY = MetaData:Sourcetype
+FORMAT = sourcetype::linux:syslog
+
+[force_sudo_index]
+REGEX = /var/log/sudo\*.log$
+DEST_KEY = _MetaData:Index
+FORMAT = sec_os_uhgid-000024
+
+
+##############################
+# GENERIC SAFETY NET (OPTIONAL)
+# Matches any remaining /var/log/* that you explicitly allow
+##############################
+[force_generic_linux_index]
+REGEX = /var/log/
+DEST_KEY = _MetaData:Index
+FORMAT = sec_os_uhgid-000024
+
+
+############################################################
+# EXISTING FIELD EXTRACTIONS (UNCHANGED)
+############################################################
 
 [linux_syslog_header]
 REGEX = ^(?<syslog_time>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(?<host>\S+)\s+(?<process>[^\[]+)\[(?<pid>\d+)\]:
 
-
-########################################################
-# AUDIT HEADER
-########################################################
-
 [linux_audit_header]
 REGEX = type=(?<audit_type>\w+)\s+msg=audit\((?<audit_epoch>\d+)\.(?<audit_ms>\d+):(?<audit_id>\d+)\)
-
-
-########################################################
-# AIDE FIELDS
-########################################################
 
 [linux_aide_fields]
 REGEX = ^(?<aide_time>\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+[+-]\d{4})\s+(?<level>\w+)\s+(?<component>[^\[]+)\[(?<pid>\d+)
 
-
-########################################################
-# ACCESS COMBINED (apache/nginx)
-########################################################
-
 [linux_access_combined]
 REGEX = ^(?<client_ip>\S+)\s+\S+\s+\S+\s+\[(?<time>[^\]]+)\]\s+"(?<method>\S+)\s+(?<uri>\S+)\s*(?<http_version>[^\"]*)"\s+(?<status>\d+)\s+(?<bytes>\d+)
-
-[set_linux_sourcetype]
-DEST_KEY = MetaData:Sourcetype
-FORMAT = sourcetype::linux:syslog
-
-[set_index]
-DEST_KEY = _MetaData:Index
-FORMAT = sec_os_uhgid-000024
