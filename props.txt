@@ -1,69 +1,44 @@
 ########################################################
-# LINUX SYSLOG (default for most logs)
+## LINUX aide
 ########################################################
 
+[linux_aide]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)(?=Start timestamp:)
+TIME_PREFIX = Start timestamp:\s*
+TIME_FORMAT = %Y-%m-%d %H:%M:%S %z
+MAX_TIMESTAMP_LOOKAHEAD = 30
+TRUNCATE = 0
+MAX_EVENTS = 1000000
+########################################################
+## LINUX SYSLOG
+########################################################
 [linux:syslog]
 SHOULD_LINEMERGE = false
 LINE_BREAKER = ([\r\n]+)(?=\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})
 TRUNCATE = 200000
-MAX_EVENTS = 10000
 TIME_PREFIX = ^
 TIME_FORMAT = %b %d %H:%M:%S
 MAX_TIMESTAMP_LOOKAHEAD = 20
-MAX_DIFF_SECS_AGO = 31536000
-MAX_DIFF_SECS_HENCE = 31536000
 KV_MODE = auto
 REPORT-syslog_header = linux_syslog_header
 
-
 ########################################################
-# LINUX AUDIT
+## LINUX AUDIT
 ########################################################
-
 [linux:audit]
-
 SHOULD_LINEMERGE = false
-
 LINE_BREAKER = ([\r\n]+)(?=type=)
-
 TRUNCATE = 200000
-MAX_EVENTS = 10000
-
 TIME_PREFIX = msg=audit\(
 TIME_FORMAT = %s
 MAX_TIMESTAMP_LOOKAHEAD = 20
-
 KV_MODE = auto
-
 REPORT-audit_header = linux_audit_header
 
-
 ########################################################
-# LINUX AIDE
+## ACCESS LOGS
 ########################################################
-
-[linux:aide]
-
-SHOULD_LINEMERGE = false
-
-LINE_BREAKER = ([\r\n]*)(?=\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2}\.\d{3})
-
-TRUNCATE = 200000
-MAX_EVENTS = 10000
-
-TIME_PREFIX = ^
-TIME_FORMAT = %m-%d-%Y %H:%M:%S.%3N %z
-MAX_TIMESTAMP_LOOKAHEAD = 30
-
-KV_MODE = auto
-
-REPORT-aide_fields = linux_aide_fields
-
-
-########################################################
-# ACCESS LOGS
-########################################################
-
 [access_combined]
 SHOULD_LINEMERGE = false
 LINE_BREAKER = ([\r\n]+)
@@ -74,157 +49,396 @@ MAX_TIMESTAMP_LOOKAHEAD = 30
 KV_MODE = none
 REPORT-access = linux_access_combined
 
-[aix:syslog]
-TRANSFORMS-normalize = set_linux_sourcetype, set_index
-
-[source::/var/log/audit/audit.log]
-TRANSFORMS-routing = set_audit_sourcetype, set_audit_index
-
-########################################################
-# GLOBAL ENFORCEMENT (HF POLICY LAYER)
-########################################################
-
 [source::*]
 
-# Step 0 - normalize bad sourcetypes
+## 0 - normalize junk sourcetypes
 TRANSFORMS-00-normalize = fix_bad_sourcetype
 
-# Step 1 - enforce approved sources (sourcetype + index)
-TRANSFORMS-01-enforce = force_audit_sourcetype, force_audit_index, force_syslog_sourcetype, force_syslog_index, force_nginx_access_sourcetype, force_nginx_error_sourcetype, force_nginx_index, force_sudo_sourcetype, force_sudo_index
-
-# Step 2 - optional safety net (ensures index always set)
-TRANSFORMS-98-index_safety = force_generic_linux_index
-
-# Step 3 - drop everything not explicitly allowed
-TRANSFORMS-99-drop = drop_events
-
+## 1 - drop noisy sources (your wildcard problem fix)
+TRANSFORMS-045-drop-noise = drop_noisy_sources,drop_instance-state_sources,drop_trino_sources,drop_temp_sources
 
 ########################################################
-# DROP BAD / ROGUE SOURCETYPES
+## GLOBAL PIPELINE (HF ENFORCEMENT)
 ########################################################
-
-[source::*]
-TRANSFORMS-01-clean = fix_bad_sourcetype
+[*-too_small]
+TRANSFORMS-remove_too_small = remove_too_small_suffix
 
 [sourcetype::*too_small*]
 TRANSFORMS-02-drop = drop_events
 
 [sourcetype::oneagent*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-03-drop = drop_events
 
 [sourcetype::dynatrace*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-04-drop = drop_events
 
 [sourcetype::ruxitagent*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-05-drop = drop_events
 
-[source::*trino*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/trino/...]
+TRANSFORMS-06-drop = drop_events
 
-[source::*amazon*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/trino/*]
+TRANSFORMS-07-drop = drop_events
 
-[source::*dynatrace*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/amazon/...]
+TRANSFORMS-08-drop = drop_events
+
+[source::/var/log/dynatrace/...]
+TRANSFORMS-09-drop = drop_events
 
 [sourcetype::vmware-vm*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-10-drop = drop_events
 
 [sourcetype::oraasmaudit]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-11-drop = drop_events
 
 [sourcetype::vmware-vg*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-12-drop = drop_events
 
-[source::*sssd*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/sssd/...]
+TRANSFORMS-13-drop = drop_events
 
-[source::*instance-state*]
-TRANSFORMS-02-drop = drop_events
-
-[source::/var/log/dnf*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/instance-state/...]
+TRANSFORMS-14-drop = drop_events
 
 [sourcetype::EIL*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-16-drop = drop_events
 
 [source::/var/log/EIL*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-17-drop = drop_events
 
-[source::/var/log/tmp*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/tmp/...]
+TRANSFORMS-18-drop = drop_events
 
-[source::/var/log/rhsm*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/rhsm/...]
+TRANSFORMS-19-drop = drop_events
 
-[source::*adfapi*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/adfapi/...]
+TRANSFORMS-20-drop = drop_events
 
-[source::*hadoop-*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/hadoop-*/...]
+TRANSFORMS-21-drop = drop_events
 
-[source::*hdxapi*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/hdxapi/...]
+TRANSFORMS-22-drop = drop_events
 
-[source::*ecs*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/ecs/...]
+TRANSFORMS-23-drop = drop_events
 
-[source::*ebx*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/ebx/...]
+TRANSFORMS-24-drop = drop_events
 
-[source::*ecdw*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/ecdw/...]
+TRANSFORMS-25-drop = drop_events
 
-[source::*rundeck*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/rundeck/...]
+TRANSFORMS-26-drop = drop_events
 
-[source::*covapi*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/covapi/...]
+TRANSFORMS-27-drop = drop_events
 
-[source::*hive**]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/hive*/...]
+TRANSFORMS-28-drop = drop_events
 
-[source::*httpd*]
-TRANSFORMS-02-drop = drop_events
+[source::/var/log/httpd/...]
+TRANSFORMS-29-drop = drop_events
 
 [sourcetype::launcher*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-30-drop = drop_events
 
 [sourcetype::jstack*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-31-drop = drop_events
 
 [sourcetype::logpusher*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-32-drop = drop_events
 
 [sourcetype::patch*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-33-drop = drop_events
 
 [sourcetype::patch_yum*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-34-drop = drop_events
 
 [sourcetype::server*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-35-drop = drop_events
 
 [sourcetype::supervisor*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-36-drop = drop_events
 
 [sourcetype::instance-state*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-37-drop = drop_events
 
 [sourcetype::instance-controller*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-38-drop = drop_events
 
 [source::/var/log/restore-runners*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-39-drop = drop_events
+
+[source::/var/log/casapi*]
+TRANSFORMS-40-drop = drop_events
 
 [source::/var/log/casnt*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-41-drop = drop_events
 
 [source::/var/log/cloud-init*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-42-drop = drop_events
 
 [source::/var/log/commvault*]
-TRANSFORMS-02-drop = drop_events
+TRANSFORMS-43-drop = drop_events
 
 [sourcetype::dnf*]
+TRANSFORMS-44-drop = drop_events
+
+[source::/var/log/hawkey.*]
+TRANSFORMS-47-drop = drop_events
+
+[source::*]
+
+## 0 - normalize junk sourcetypes
+TRANSFORMS-00-normalize = fix_bad_sourcetype
+
+## 1 - drop noisy sources (your wildcard problem fix)
+TRANSFORMS-045-drop-noise = drop_noisy_sources,drop_instance-state_sources,drop_trino_sources,drop_temp_sources
+
+## 2 - enforce sourcetype + index
+TRANSFORMS-46-enforce = force_audit_sourcetype,force_audit_index,force_syslog_sourcetype,force_syslog_index,force_nginx_access_sourcetype,force_nginx_error_sourcetype,force_nginx_index,force_sudo_sourcetype,force_sudo_index
+
+## 3 - ensure index fallback
+TRANSFORMS-98-index_safety = force_generic_linux_index
+
+## 4 - debug (optional)
+TRANSFORMS-97-debug = debug_events
+
+## 5 - drop everything else (optional strict mode)
+# TRANSFORMS-99-drop = drop_events
+
+###############
+# MCDS Log Parsing
+###############
+[mcds_soap]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)\*?(?=SOAP (?:REQUEST RECEIVED|RESPONSE))
+TIME_PREFIX = TIME:\s+
+TIME_FORMAT = %d/%b/%Y:%H:%M:%S
+MAX_TIMESTAMP_LOOKAHEAD = 20
+TRUNCATE = 0
+SEDCMD-strip-stars = s/^\*+$//g
+SEDCMD-strip-star-prefix = s/^\*+(SOAP (REQUEST RECEIVED|RESPONSE))/\1/g
+
+########################################################
+## productioncycle logs
+########################################################
+[productioncycle]
+
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)(?=\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d{3}\s+(?:INFO|WARN|ERROR|DEBUG|TRACE|FATAL))
+TIME_PREFIX = ^
+TIME_FORMAT = %Y-%m-%d %H:%M:%S,%3N
+MAX_TIMESTAMP_LOOKAHEAD = 23
+TRUNCATE = 0
+
+########################################################
+## LINUX aide
+########################################################
+
+[linux_aide]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)(?=Start timestamp:)
+TIME_PREFIX = Start timestamp:\s*
+TIME_FORMAT = %Y-%m-%d %H:%M:%S %z
+MAX_TIMESTAMP_LOOKAHEAD = 30
+TRUNCATE = 0
+MAX_EVENTS = 1000000
+
+########################################################
+## text logs
+########################################################
+
+[text]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)(?=\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s:)
+TIME_PREFIX = ^
+TIME_FORMAT = %Y-%m-%d %H:%M:%S.%3N
+MAX_TIMESTAMP_LOOKAHEAD = 23
+TRUNCATE = 0
+
+###############
+# LOG4J Log Parsing
+###############
+
+[log4j]
+
+SHOULD_LINEMERGE = false
+
+BREAK_ONLY_BEFORE = ^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}
+
+TIME_FORMAT = %Y-%m-%d %H:%M:%S.%3N
+MAX_TIMESTAMP_LOOKAHEAD = 23
+
+TRUNCATE = 0
+MAX_EVENTS = 10000
+
+KV_MODE = none
+########################################################
+## GLOBAL PIPELINE (HF ENFORCEMENT)
+########################################################
+[*-too_small]
+TRANSFORMS-remove_too_small = remove_too_small_suffix
+
+[sourcetype::*too_small*]
 TRANSFORMS-02-drop = drop_events
+
+[sourcetype::oneagent*]
+TRANSFORMS-03-drop = drop_events
+
+[sourcetype::dynatrace*]
+TRANSFORMS-04-drop = drop_events
+
+[sourcetype::ruxitagent*]
+TRANSFORMS-05-drop = drop_events
+
+[source::/var/log/trino/...]
+TRANSFORMS-06-drop = drop_events
+
+[source::/var/log/trino/*]
+TRANSFORMS-07-drop = drop_events
+
+[source::/var/log/amazon/...]
+TRANSFORMS-08-drop = drop_events
+
+[source::/var/log/dynatrace/...]
+TRANSFORMS-09-drop = drop_events
+
+[sourcetype::vmware-vm*]
+TRANSFORMS-10-drop = drop_events
+
+[sourcetype::oraasmaudit]
+TRANSFORMS-11-drop = drop_events
+
+[sourcetype::vmware-vg*]
+TRANSFORMS-12-drop = drop_events
+
+[source::/var/log/sssd/...]
+TRANSFORMS-13-drop = drop_events
+
+[source::/var/log/instance-state/...]
+TRANSFORMS-14-drop = drop_events
+
+[source::/var/log/dnf*]
+TRANSFORMS-15-drop = drop_events
+
+[sourcetype::EIL*]
+TRANSFORMS-16-drop = drop_events
+
+[source::/var/log/EIL*]
+TRANSFORMS-17-drop = drop_events
+
+[source::/var/log/tmp/...]
+TRANSFORMS-18-drop = drop_events
+
+[source::/var/log/rhsm/...]
+TRANSFORMS-19-drop = drop_events
+
+[source::/var/log/adfapi/...]
+TRANSFORMS-20-drop = drop_events
+
+[source::/var/log/hadoop-*/...]
+TRANSFORMS-21-drop = drop_events
+
+[source::/var/log/hdxapi/...]
+TRANSFORMS-22-drop = drop_events
+
+[source::/var/log/ecs/...]
+TRANSFORMS-23-drop = drop_events
+
+[source::/var/log/ebx/...]
+TRANSFORMS-24-drop = drop_events
+
+[source::/var/log/ecdw/...]
+TRANSFORMS-25-drop = drop_events
+
+[source::/var/log/rundeck/...]
+TRANSFORMS-26-drop = drop_events
+
+[source::/var/log/covapi/...]
+TRANSFORMS-27-drop = drop_events
+
+[source::/var/log/hive*/...]
+TRANSFORMS-28-drop = drop_events
+
+[source::/var/log/httpd/...]
+TRANSFORMS-29-drop = drop_events
+
+[sourcetype::launcher*]
+TRANSFORMS-30-drop = drop_events
+
+[sourcetype::jstack*]
+TRANSFORMS-31-drop = drop_events
+
+[sourcetype::logpusher*]
+TRANSFORMS-32-drop = drop_events
+
+[sourcetype::patch*]
+TRANSFORMS-33-drop = drop_events
+
+[sourcetype::patch_yum*]
+TRANSFORMS-34-drop = drop_events
+
+[sourcetype::server*]
+TRANSFORMS-35-drop = drop_events
+
+[sourcetype::supervisor*]
+TRANSFORMS-36-drop = drop_events
+
+[sourcetype::instance-state*]
+TRANSFORMS-37-drop = drop_events
+
+[sourcetype::instance-controller*]
+TRANSFORMS-38-drop = drop_events
+
+[source::/var/log/restore-runners*]
+TRANSFORMS-39-drop = drop_events
+
+[source::/var/log/casapi*]
+TRANSFORMS-40-drop = drop_events
+
+[source::/var/log/casnt*]
+TRANSFORMS-41-drop = drop_events
+
+[source::/var/log/cloud-init*]
+TRANSFORMS-42-drop = drop_events
+
+[source::/var/log/commvault*]
+TRANSFORMS-43-drop = drop_events
+
+[source::/var/log/hawkey.*]
+TRANSFORMS-47-drop = drop_events
+
+[source::/var/log/trino/server*]
+TRANSFORMS-48-drop = drop_events
+########################################################
+## GLOBAL PIPELINE (HF ENFORCEMENT)
+########################################################
+
+[*-too_small]
+TRANSFORMS-remove_too_small = remove_too_small_suffix
+
+[source::*]
+
+## 0 - normalize junk sourcetypes
+TRANSFORMS-00-normalize = fix_bad_sourcetype, remove_too_small_suffix
+
+## 1 - drop noisy sources (your wildcard problem fix)
+TRANSFORMS-02-drop-noise = drop_noisy_sources
+
+## 2 - enforce sourcetype + index
+TRANSFORMS-10-enforce = force_audit_sourcetype,force_audit_index,force_syslog_sourcetype,force_syslog_index,force_nginx_access_sourcetype,force_nginx_error_sourcetype,force_nginx_index,force_sudo_sourcetype,force_sudo_index
+
+## 3 - ensure index fallback
+TRANSFORMS-98-index_safety = force_generic_linux_index
+
+## 4 - debug (optional)
+TRANSFORMS-97-debug = debug_events
+
+## 5 - drop everything else (optional strict mode)
+# TRANSFORMS-99-drop = drop_events
