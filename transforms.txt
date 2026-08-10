@@ -1,5 +1,6 @@
+
 ############################################################
-# DROP EVERYTHING NOT EXPLICITLY CORRECTED
+## DROP RULE (DISABLED BY DEFAULT FOR SAFETY)
 ############################################################
 [drop_events]
 REGEX = .
@@ -7,106 +8,185 @@ DEST_KEY = queue
 FORMAT = nullQueue
 
 
-########################################################
-# GLOBAL SOURCETYPE NORMALIZATION (KEEP EXISTING)
-########################################################
+############################################################
+## DROP NOISY SOURCES (FIXED REGEX)
+############################################################
+[drop_noisy_sources]
+REGEX = ^/var/log/(amazon|aso|azure|commvault|candlepin|casrs|casapi|casnt|dynatrace|ecdw|ecs|foreman|hadoop.*|hdxapi|hive.*|instance-state|provision-node|redis|rhsm|rundeck|sssd|tmp|trino|vmware.*|vmware-*|cloud-init|dnf).*
+DEST_KEY = queue
+FORMAT = nullQueue
+
+[drop_instance-state_sources]
+REGEX = ^/var/log/instance-state\*.log$
+DEST_KEY = queue
+FORMAT = nullQueue
+
+[drop_trino_sources]
+REGEX = ^/var/log/trino\*.log$
+DEST_KEY = queue
+FORMAT = nullQueue
+
+[drop_temp_sources]
+REGEX = ^/var/log/tmp\*.log$
+DEST_KEY = queue
+FORMAT = nullQueue
+############################################################
+## DEBUG ROUTING (OPTIONAL BUT VERY USEFUL)
+############################################################
+[debug_events]
+REGEX = .
+DEST_KEY = _MetaData:Index
+FORMAT = debug_linux_pipeline
+
+############################################################
+## GLOBAL SOURCETYPE NORMALIZATION
+############################################################
 [fix_bad_sourcetype]
-# Strips -2, -7, -too_small, timestamps, etc
-REGEX = ^([^-\s]+(?:-[^-\s]+)*?)(?:-\d+|-too_small.*|-20\d{2}.*)?$
+REGEX = ([-\s]+[^-\s]+_?)(?:-\d+-too_small.*-20\d{2}.*)?$
 DEST_KEY = MetaData:Sourcetype
 FORMAT = sourcetype::$1
 
-
-########################################################
-# ====== SOURCE-BASED ENFORCEMENT RULES ======
-# These OVERRIDE bad metadata (sourcetype + index)
-########################################################
-
-##############################
-# AUDIT LOGS (handles rotation)
-##############################
+############################################################
+## AUDIT LOGS
+############################################################
 [force_audit_sourcetype]
-REGEX = /var/log/audit/audit/.log(\.\d+)?
+REGEX = /var/log/audit/audit\.log(\.\d+)?
 DEST_KEY = MetaData:Sourcetype
-FORMAT = sourcetype::linux_audit
+FORMAT = sourcetype::linux:audit
 WRITE_META = true
 
 [force_audit_index]
-REGEX = /var/log/audit/audit/.log(\.\d+)?
+REGEX = /var/log/audit/audit\.log(\.\d+)?
 DEST_KEY = _MetaData:Index
 FORMAT = sec_os_uhgid-000024
 
-
-##############################
-# SYSLOG FAMILY
-##############################
+############################################################
+## SYSLOG FAMILY
+############################################################
 [force_syslog_sourcetype]
-REGEX = /var/log/(secure|messages|cron|syslog|kern\*.log$)
+REGEX = /var/log/(secure|messages|cron|syslog|kern\.log)(\.\d+)?
 DEST_KEY = MetaData:Sourcetype
 FORMAT = sourcetype::linux:syslog
 WRITE_META = true
 
 [force_syslog_index]
-REGEX = /var/log/(secure|messages|cron|syslog|kern\*.log$)
+REGEX = /var/log/(secure|messages|cron|syslog|kern\.log)(\.\d+)?
 DEST_KEY = _MetaData:Index
 FORMAT = sec_os_uhgid-000024
 
-
-##############################
-# NGINX
-##############################
+############################################################
+## NGINX
+############################################################
 [force_nginx_access_sourcetype]
-REGEX = /var/log/nginx/access\*.log$
+REGEX = /var/log/nginx/access.*\.log$
 DEST_KEY = MetaData:Sourcetype
 FORMAT = sourcetype::access_combined
 
 [force_nginx_error_sourcetype]
-REGEX = /var/log/nginx/error\*.log$
+REGEX = /var/log/nginx/error.*\.log$
 DEST_KEY = MetaData:Sourcetype
 FORMAT = sourcetype::linux:syslog
 
 [force_nginx_index]
-REGEX = /var/log/nginx/(access|error)\*.log$
+REGEX = /var/log/nginx/(access|error).*\.log$
 DEST_KEY = _MetaData:Index
 FORMAT = sec_weblogs_uhgid-000024
 
-
-##############################
-# SUDO LOG
-##############################
+############################################################
+## SUDO
+############################################################
 [force_sudo_sourcetype]
-REGEX = /var/log/sudo\*.log$
+REGEX = /var/log/sudo.*\.log$
 DEST_KEY = MetaData:Sourcetype
 FORMAT = sourcetype::linux:syslog
 
 [force_sudo_index]
-REGEX = /var/log/sudo\*.log$
+REGEX = /var/log/sudo.*\.log$
 DEST_KEY = _MetaData:Index
 FORMAT = sec_os_uhgid-000024
 
-
-##############################
-# GENERIC SAFETY NET (OPTIONAL)
-# Matches any remaining /var/log/* that you explicitly allow
-##############################
+############################################################
+## GENERIC FALLBACK (SAFE DEFAULT)
+############################################################
 [force_generic_linux_index]
 REGEX = /var/log/
 DEST_KEY = _MetaData:Index
 FORMAT = sec_os_uhgid-000024
 
+############################################################
+## FIELD EXTRACTIONS (FIXED REGEX)
+############################################################
 
-############################################################
-# EXISTING FIELD EXTRACTIONS (UNCHANGED)
-############################################################
+[remove_too_small_suffix]
+REGEX = ^(.*)-too_small$
+DEST_KEY = MetaData:Sourcetype
+FORMAT = sourcetype::$1
+
 
 [linux_syslog_header]
-REGEX = ^(?<syslog_time>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(?<host>\S+)\s+(?<process>[^\[]+)\[(?<pid>\d+)\]:
+REGEX = (?<syslog_time>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(?<host>\S+)\s+(?<process>[^\[]+)\[(?<pid>\d+)\]:
 
 [linux_audit_header]
 REGEX = type=(?<audit_type>\w+)\s+msg=audit\((?<audit_epoch>\d+)\.(?<audit_ms>\d+):(?<audit_id>\d+)\)
 
 [linux_aide_fields]
-REGEX = ^(?<aide_time>\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+[+-]\d{4})\s+(?<level>\w+)\s+(?<component>[^\[]+)\[(?<pid>\d+)
+REGEX = (?<aide_time>\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+[+-]\d{4})\s+(?<host>\w+)
 
 [linux_access_combined]
-REGEX = ^(?<client_ip>\S+)\s+\S+\s+\S+\s+\[(?<time>[^\]]+)\]\s+"(?<method>\S+)\s+(?<uri>\S+)\s*(?<http_version>[^\"]*)"\s+(?<status>\d+)\s+(?<bytes>\d+)
+REGEX = (?<client_ip>\S+)\s+\S+\s+\S+\s+\[(?<timestamp>[^\]]+)\]\s+"(?<method>\S+)\s+(?<uri>\S+)\s*(?<http_version>[^"]*)"\s+(?<status>\d+)\s+(?<bytes>\d+)
+
+############################################################
+## DROP RULE (DISABLED BY DEFAULT FOR SAFETY)
+############################################################
+[drop_events]
+REGEX = .
+DEST_KEY = queue
+FORMAT = nullQueue
+
+
+############################################################
+## DROP NOISY SOURCES (FIXED REGEX)
+############################################################
+[drop_noisy_sources]
+REGEX = ^/var/log/(amazon|aso|azure|commvault|candlepin|casrs|casapi|casnt|dynatrace|ecdw|ecs|foreman|hadoop.*|hdxapi|hive.*|instance-state|provision-node|redis|rhsm|rundeck|sssd|tmp|trino|vmware.*|vmware-*|cloud-init|dnf).*
+DEST_KEY = queue
+FORMAT = nullQueue
+
+[drop_instance-state_sources]
+REGEX = ^/var/log/instance-state\*.log$
+DEST_KEY = queue
+FORMAT = nullQueue
+
+[drop_trino_sources]
+REGEX = ^/var/log/trino\*.log$
+DEST_KEY = queue
+FORMAT = nullQueue
+
+[drop_temp_sources]
+REGEX = ^/var/log/tmp\*.log$
+DEST_KEY = queue
+FORMAT = nullQueue
+############################################################
+## DEBUG ROUTING (OPTIONAL BUT VERY USEFUL)
+############################################################
+[debug_events]
+REGEX = .
+DEST_KEY = _MetaData:Index
+FORMAT = debug_linux_pipeline
+
+############################################################
+## GLOBAL SOURCETYPE NORMALIZATION
+############################################################
+
+[remove_too_small_suffix]
+REGEX = ^(.*)-too_small$
+DEST_KEY = MetaData:Sourcetype
+FORMAT = sourcetype::$1
+
+[fix_bad_sourcetype]
+SOURCE_KEY = MetaData:Sourcetype
+REGEX = ^\s*(.+??)(?:-(?:too_small|\d+)).*$
+FORMAT = sourcetype::$1
+DEST_KEY = MetaData:Sourcetype
+WRITE_META = true
+
