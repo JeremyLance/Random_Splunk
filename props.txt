@@ -1,444 +1,182 @@
-########################################################
-## LINUX aide
-########################################################
-
-[linux_aide]
-SHOULD_LINEMERGE = false
-LINE_BREAKER = ([\r\n]+)(?=Start timestamp:)
-TIME_PREFIX = Start timestamp:\s*
-TIME_FORMAT = %Y-%m-%d %H:%M:%S %z
-MAX_TIMESTAMP_LOOKAHEAD = 30
-TRUNCATE = 0
-MAX_EVENTS = 1000000
-########################################################
-## LINUX SYSLOG
-########################################################
-[linux:syslog]
-SHOULD_LINEMERGE = false
-LINE_BREAKER = ([\r\n]+)(?=\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})
-TRUNCATE = 200000
-TIME_PREFIX = ^
-TIME_FORMAT = %b %d %H:%M:%S
-MAX_TIMESTAMP_LOOKAHEAD = 20
-KV_MODE = auto
-REPORT-syslog_header = linux_syslog_header
-
-########################################################
-## LINUX AUDIT
-########################################################
-[linux:audit]
-SHOULD_LINEMERGE = false
-LINE_BREAKER = ([\r\n]+)(?=type=)
-TRUNCATE = 200000
-TIME_PREFIX = msg=audit\(
-TIME_FORMAT = %s
-MAX_TIMESTAMP_LOOKAHEAD = 20
-KV_MODE = auto
-REPORT-audit_header = linux_audit_header
-
-########################################################
-## ACCESS LOGS
-########################################################
-[access_combined]
-SHOULD_LINEMERGE = false
-LINE_BREAKER = ([\r\n]+)
-TRUNCATE = 200000
-TIME_PREFIX = \[
-TIME_FORMAT = %d/%b/%Y:%H:%M:%S %z
-MAX_TIMESTAMP_LOOKAHEAD = 30
-KV_MODE = none
-REPORT-access = linux_access_combined
-
-[source::*]
-
-## 0 - normalize junk sourcetypes
-TRANSFORMS-00-normalize = fix_bad_sourcetype
-
-## 1 - drop noisy sources (your wildcard problem fix)
-TRANSFORMS-045-drop-noise = drop_noisy_sources,drop_instance-state_sources,drop_trino_sources,drop_temp_sources
-
-########################################################
-## GLOBAL PIPELINE (HF ENFORCEMENT)
-########################################################
-[*-too_small]
-TRANSFORMS-remove_too_small = remove_too_small_suffix
+[too_small]
+RULESET-ruleset_-too_small = _rule:ruleset_-too_small:filter:regex:too_small
 
-[sourcetype::*too_small*]
-TRANSFORMS-02-drop = drop_events
+[instance-state-too_small]
+RULESET-ruleset_instance-state-too_small = _rule:ruleset_instance-state-too_small:filter:regex:fuvgx99n
 
-[sourcetype::oneagent*]
-TRANSFORMS-03-drop = drop_events
+[instance-state-15]
+RULESET-ruleset_instance-state-15 = _rule:ruleset_instance-state-15:filter:regex:fmpnbue9
 
-[sourcetype::dynatrace*]
-TRANSFORMS-04-drop = drop_events
+[instance-state-10]
+RULESET-ruleset_instance-state-10 = _rule:ruleset_instance-state-10:filter:regex:fccizefy
 
-[sourcetype::ruxitagent*]
-TRANSFORMS-05-drop = drop_events
+[amazon-ssm-agent-2]
+RULESET-ruleset_amazon-ssm-agent-2 = _rule:ruleset_amazon-ssm-agent-2:filter:regex:fupebzl4
 
-[source::/var/log/trino/...]
-TRANSFORMS-06-drop = drop_events
+[cloud-init-output-3]
+RULESET-ruleset_cloud-init-output-3 = _rule:ruleset_cloud-init-output-3:filter:regex:fjbyca6c
 
-[source::/var/log/trino/*]
-TRANSFORMS-07-drop = drop_events
+[jstack-too_small]
+RULESET-ruleset_jstack-too_small = _rule:ruleset_jstack-too_small:filter:regex:fhxxvjsg
 
-[source::/var/log/amazon/...]
-TRANSFORMS-08-drop = drop_events
+[_opt_Quadient_InspireScaler_logs_server-too_small]
+RULESET-ruleset__opt_Quadient_InspireScaler_logs_server-too_small = _rule:ruleset__opt_Quadient_InspireScaler_logs_server-too_small:filter:regex:fwmkxrp0
 
-[source::/var/log/dynatrace/...]
-TRANSFORMS-09-drop = drop_events
+[_var_log_amazon_ssm_amazon-ssm-agent-too_small]
+RULESET-ruleset__var_log_amazon_ssm_amazon-ssm-agent-too_small = _rule:ruleset__var_log_amazon_ssm_amazon-ssm-agent-too_small:filter:regex:fb81vkt8
 
-[sourcetype::vmware-vm*]
-TRANSFORMS-10-drop = drop_events
+[_var_log_audit_audit-too_small]
+RULESET-ruleset__var_log_audit_audit-too_small = _rule:ruleset__var_log_audit_audit-too_small:filter:regex:ffnqkmtz
 
-[sourcetype::oraasmaudit]
-TRANSFORMS-11-drop = drop_events
+[_var_log_messages-too_small]
+RULESET-ruleset__var_log_messages-too_small = _rule:ruleset__var_log_messages-too_small:filter:regex:ftxl9oay
 
-[sourcetype::vmware-vg*]
-TRANSFORMS-12-drop = drop_events
+[access-too_small]
+RULESET-ruleset_access-too_small = _rule:ruleset_access-too_small:filter:regex:fmjfgy3i
 
-[source::/var/log/sssd/...]
-TRANSFORMS-13-drop = drop_events
+[aide.log]
+RULESET-ruleset_aide_log = _rule:ruleset_aide_log:filter:regex:fqyqcuuu
 
-[source::/var/log/instance-state/...]
-TRANSFORMS-14-drop = drop_events
+[aide-2]
+RULESET-ruleset_aide-2 = _rule:ruleset_aide-2:filter:regex:fewj9enk
 
-[sourcetype::EIL*]
-TRANSFORMS-16-drop = drop_events
+[aide-3]
+RULESET-ruleset_aide-3 = _rule:ruleset_aide-3:filter:regex:fxv1dk4q
 
-[source::/var/log/EIL*]
-TRANSFORMS-17-drop = drop_events
+[aide-4]
+RULESET-ruleset_aide-4 = _rule:ruleset_aide-4:filter:regex:fjyfe14g
 
-[source::/var/log/tmp/...]
-TRANSFORMS-18-drop = drop_events
+[aide-6]
+RULESET-ruleset_aide-6 = _rule:ruleset_aide-6:filter:regex:f06xw5mw
 
-[source::/var/log/rhsm/...]
-TRANSFORMS-19-drop = drop_events
+[aide-too_small]
+RULESET-ruleset_aide-too_small = _rule:ruleset_aide-too_small:filter:regex:fkdrx75w
 
-[source::/var/log/adfapi/...]
-TRANSFORMS-20-drop = drop_events
+[allwin]
+RULESET-ruleset_allwin = _rule:ruleset_allwin:filter:regex:fa28y3nl
 
-[source::/var/log/hadoop-*/...]
-TRANSFORMS-21-drop = drop_events
+[boot]
+RULESET-ruleset_boot = _rule:ruleset_boot:filter:regex:fy8gzn7r
 
-[source::/var/log/hdxapi/...]
-TRANSFORMS-22-drop = drop_events
+[oneagent_latest_snapshot]
+RULESET-ruleset_oneagent_latest_snapshot = _rule:ruleset_oneagent_latest_snapshot:filter:regex:f6t8xyws
 
-[source::/var/log/ecs/...]
-TRANSFORMS-23-drop = drop_events
+[logpusher-2]
+RULESET-ruleset_logpusher-2 = _rule:ruleset_logpusher-2:filter:regex:f4jbj3p6
 
-[source::/var/log/ebx/...]
-TRANSFORMS-24-drop = drop_events
+[instance-state-3]
+RULESET-ruleset_instance-state-3 = _rule:ruleset_instance-state-3:filter:regex:f4h6dfm6
 
-[source::/var/log/ecdw/...]
-TRANSFORMS-25-drop = drop_events
+[secure_gateway_app_internal_log]
+RULESET-ruleset_secure_gateway_app_internal_log = _rule:ruleset_secure_gateway_app_internal_log:filter:regex:fah0bhpb
 
-[source::/var/log/rundeck/...]
-TRANSFORMS-26-drop = drop_events
+[hadoop-yarn-resourcemanager-ip-10-157-116-74.healthcareit.net-too_small]
+RULESET-ruleset_hadoop-yarn-resourcemanager-ip-10-157-116-74_healthcareit_net-too_small = _rule:ruleset_hadoop-yarn-resourcemanager-ip-10-157-116-74_healthcareit_net-too_small:filter:regex:f77v6qy3
 
-[source::/var/log/covapi/...]
-TRANSFORMS-27-drop = drop_events
+[node:sidecar:agent_manager:stdout]
+RULESET-ruleset_node_sidecar_agent_manager_stdout = _rule:ruleset_node_sidecar_agent_manager_stdout:filter:regex:fjah27sq
 
-[source::/var/log/hive*/...]
-TRANSFORMS-28-drop = drop_events
+[node:sidecar:cmp_orchestrator]
+RULESET-ruleset_node_sidecar_cmp_orchestrator = _rule:ruleset_node_sidecar_cmp_orchestrator:filter:regex:f9gw7ody
 
-[source::/var/log/httpd/...]
-TRANSFORMS-29-drop = drop_events
+[node:sidecar:cmp_orchestrator:stdout]
+RULESET-ruleset_node_sidecar_cmp_orchestrator_stdout = _rule:ruleset_node_sidecar_cmp_orchestrator_stdout:filter:regex:f2rspzgn
 
-[sourcetype::launcher*]
-TRANSFORMS-30-drop = drop_events
+[node:sidecar:ipc_broker:stdout]
+RULESET-ruleset_node_sidecar_ipc_broker_stdout = _rule:ruleset_node_sidecar_ipc_broker_stdout:filter:regex:fuw459wk
 
-[sourcetype::jstack*]
-TRANSFORMS-31-drop = drop_events
+[node:sidecar:postgres:stderr]
+RULESET-ruleset_node_sidecar_postgres_stderr = _rule:ruleset_node_sidecar_postgres_stderr:filter:regex:fgph1zll
 
-[sourcetype::logpusher*]
-TRANSFORMS-32-drop = drop_events
+[puppet_core_set-too_small]
+RULESET-ruleset_puppet_core_set-too_small = _rule:ruleset_puppet_core_set-too_small:filter:regex:fc46ijcl
 
-[sourcetype::patch*]
-TRANSFORMS-33-drop = drop_events
+[audit-6]
+RULESET-ruleset_audit-6 = _rule:ruleset_audit-6:filter:regex:fr6zqc5v
 
-[sourcetype::patch_yum*]
-TRANSFORMS-34-drop = drop_events
+[microsoft_defender_enterprise_err-too_small]
+RULESET-ruleset_microsoft_defender_enterprise_err-too_small = _rule:ruleset_microsoft_defender_enterprise_err-too_small:filter:regex:fokr57j5
 
-[sourcetype::server*]
-TRANSFORMS-35-drop = drop_events
+[microsoft_defender_core-too_small]
+RULESET-ruleset_microsoft_defender_core-too_small = _rule:ruleset_microsoft_defender_core-too_small:filter:regex:f4nc8mu5
 
-[sourcetype::supervisor*]
-TRANSFORMS-36-drop = drop_events
+[debug-too_small]
+RULESET-ruleset_debug-too_small = _rule:ruleset_debug-too_small:filter:regex:fisbnf6i
 
-[sourcetype::instance-state*]
-TRANSFORMS-37-drop = drop_events
+[microsoft_defender_enterprise-too_small]
+RULESET-ruleset_microsoft_defender_enterprise-too_small = _rule:ruleset_microsoft_defender_enterprise-too_small:filter:regex:ff1uxpwf
 
-[sourcetype::instance-controller*]
-TRANSFORMS-38-drop = drop_events
+[cron-too_small]
+RULESET-ruleset_cron-too_small = _rule:ruleset_cron-too_small:filter:regex:f2c1i4ut
 
-[source::/var/log/restore-runners*]
-TRANSFORMS-39-drop = drop_events
+[puppet_aux_set-too_small]
+RULESET-ruleset_puppet_aux_set-too_small = _rule:ruleset_puppet_aux_set-too_small:filter:regex:ffi4nduf
 
-[source::/var/log/casapi*]
-TRANSFORMS-40-drop = drop_events
+[_opt_apigee_var_log_edge-message-processor_edge-message-processor-too_small]
+RULESET-ruleset__opt_apigee_var_log_edge-message-processor_edge-message-processor-too_small = _rule:ruleset__opt_apigee_var_log_edge-message-processor_edge-message-processor-too_small:filter:regex:f40trwr4
 
-[source::/var/log/casnt*]
-TRANSFORMS-41-drop = drop_events
+[error-too_small]
+RULESET-ruleset_error-too_small = _rule:ruleset_error-too_small:filter:regex:f7d5dciw
 
-[source::/var/log/cloud-init*]
-TRANSFORMS-42-drop = drop_events
+[veeva-user-data-too_small]
+RULESET-ruleset_veeva-user-data-too_small = _rule:ruleset_veeva-user-data-too_small:filter:regex:fn40unx3
 
-[source::/var/log/commvault*]
-TRANSFORMS-43-drop = drop_events
+[master-too_small]
+RULESET-ruleset_master-too_small = _rule:ruleset_master-too_small:filter:regex:fdlchnot
 
-[sourcetype::dnf*]
-TRANSFORMS-44-drop = drop_events
+[setup-dns-too_small]
+RULESET-ruleset_setup-dns-too_small = _rule:ruleset_setup-dns-too_small:filter:regex:f63ji1qr
 
-[source::/var/log/hawkey.*]
-TRANSFORMS-47-drop = drop_events
+[mk-tmp-on-root-too_small]
+RULESET-ruleset_mk-tmp-on-root-too_small = _rule:ruleset_mk-tmp-on-root-too_small:filter:regex:fxv5rhdo
 
-[source::*]
+[waagent-4]
+RULESET-ruleset_waagent-4 = _rule:ruleset_waagent-4:filter:regex:f8mvzzuy
 
-## 0 - normalize junk sourcetypes
-TRANSFORMS-00-normalize = fix_bad_sourcetype
+[platform-setup-too_small]
+RULESET-ruleset_platform-setup-too_small = _rule:ruleset_platform-setup-too_small:filter:regex:faxillvm
 
-## 1 - drop noisy sources (your wildcard problem fix)
-TRANSFORMS-045-drop-noise = drop_noisy_sources,drop_instance-state_sources,drop_trino_sources,drop_temp_sources
+[waagent-3]
+RULESET-ruleset_waagent-3 = _rule:ruleset_waagent-3:filter:regex:fiu42ny6
 
-## 2 - enforce sourcetype + index
-TRANSFORMS-46-enforce = force_audit_sourcetype,force_audit_index,force_syslog_sourcetype,force_syslog_index,force_nginx_access_sourcetype,force_nginx_error_sourcetype,force_nginx_index,force_sudo_sourcetype,force_sudo_index
+[copy_kyle_minus-2]
+RULESET-ruleset_copy_kyle_minus-2 = _rule:ruleset_copy_kyle_minus-2:filter:regex:fjar0wa8
 
-## 3 - ensure index fallback
-TRANSFORMS-98-index_safety = force_generic_linux_index
+[error-8]
+RULESET-ruleset_error-8 = _rule:ruleset_error-8:filter:regex:fbcp1oah
 
-## 4 - debug (optional)
-TRANSFORMS-97-debug = debug_events
+[microsoft_defender_core_err-too_small]
+RULESET-ruleset_microsoft_defender_core_err-too_small = _rule:ruleset_microsoft_defender_core_err-too_small:filter:regex:f6moantf
 
-## 5 - drop everything else (optional strict mode)
-# TRANSFORMS-99-drop = drop_events
+[sudo-too_small]
+RULESET-ruleset_sudo-too_small = _rule:ruleset_sudo-too_small:filter:regex:faqajmtl
 
-###############
-# MCDS Log Parsing
-###############
-[mcds_soap]
-SHOULD_LINEMERGE = false
-LINE_BREAKER = ([\r\n]+)\*?(?=SOAP (?:REQUEST RECEIVED|RESPONSE))
-TIME_PREFIX = TIME:\s+
-TIME_FORMAT = %d/%b/%Y:%H:%M:%S
-MAX_TIMESTAMP_LOOKAHEAD = 20
-TRUNCATE = 0
-SEDCMD-strip-stars = s/^\*+$//g
-SEDCMD-strip-star-prefix = s/^\*+(SOAP (REQUEST RECEIVED|RESPONSE))/\1/g
+[cloud-init-output-2]
+RULESET-ruleset_cloud-init-output-2 = _rule:ruleset_cloud-init-output-2:filter:regex:fa3x6bb0
 
-########################################################
-## productioncycle logs
-########################################################
-[productioncycle]
+[CommandExecution-3]
+RULESET-ruleset_CommandExecution-3 = _rule:ruleset_CommandExecution-3:filter:regex:fhkfw34q
 
-SHOULD_LINEMERGE = false
-LINE_BREAKER = ([\r\n]+)(?=\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2},\d{3}\s+(?:INFO|WARN|ERROR|DEBUG|TRACE|FATAL))
-TIME_PREFIX = ^
-TIME_FORMAT = %Y-%m-%d %H:%M:%S,%3N
-MAX_TIMESTAMP_LOOKAHEAD = 23
-TRUNCATE = 0
+[CommandExecution-too_small]
+RULESET-ruleset_CommandExecution-too_small = _rule:ruleset_CommandExecution-too_small:filter:regex:ffb102ot
 
-########################################################
-## LINUX aide
-########################################################
+[communication-2]
+RULESET-ruleset_communication-2 = _rule:ruleset_communication-2:filter:regex:f8s07s4k
 
-[linux_aide]
-SHOULD_LINEMERGE = false
-LINE_BREAKER = ([\r\n]+)(?=Start timestamp:)
-TIME_PREFIX = Start timestamp:\s*
-TIME_FORMAT = %Y-%m-%d %H:%M:%S %z
-MAX_TIMESTAMP_LOOKAHEAD = 30
-TRUNCATE = 0
-MAX_EVENTS = 1000000
+[communication-too_small]
+RULESET-ruleset_communication-too_small = _rule:ruleset_communication-too_small:filter:regex:fbc33q41
 
-########################################################
-## text logs
-########################################################
+[console-too_small]
+RULESET-ruleset_console-too_small = _rule:ruleset_console-too_small:filter:regex:fizbre01
 
-[text]
-SHOULD_LINEMERGE = false
-LINE_BREAKER = ([\r\n]+)(?=\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s:)
-TIME_PREFIX = ^
-TIME_FORMAT = %Y-%m-%d %H:%M:%S.%3N
-MAX_TIMESTAMP_LOOKAHEAD = 23
-TRUNCATE = 0
+[dbx_server_connection_pool_metrics]
+RULESET-ruleset_dbx_server_connection_pool_metrics = _rule:ruleset_dbx_server_connection_pool_metrics:filter:regex:fcffip3r
 
-###############
-# LOG4J Log Parsing
-###############
+[dbx_server_health_metrics]
+RULESET-ruleset_dbx_server_health_metrics = _rule:ruleset_dbx_server_health_metrics:filter:regex:fmln1x3d
 
-[log4j]
+[debug-21]
+RULESET-ruleset_debug-21 = _rule:ruleset_debug-21:filter:regex:f5frukmq
 
-SHOULD_LINEMERGE = false
-
-BREAK_ONLY_BEFORE = ^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3}
-
-TIME_FORMAT = %Y-%m-%d %H:%M:%S.%3N
-MAX_TIMESTAMP_LOOKAHEAD = 23
-
-TRUNCATE = 0
-MAX_EVENTS = 10000
-
-KV_MODE = none
-########################################################
-## GLOBAL PIPELINE (HF ENFORCEMENT)
-########################################################
-[*-too_small]
-TRANSFORMS-remove_too_small = remove_too_small_suffix
-
-[sourcetype::*too_small*]
-TRANSFORMS-02-drop = drop_events
-
-[sourcetype::oneagent*]
-TRANSFORMS-03-drop = drop_events
-
-[sourcetype::dynatrace*]
-TRANSFORMS-04-drop = drop_events
-
-[sourcetype::ruxitagent*]
-TRANSFORMS-05-drop = drop_events
-
-[source::/var/log/trino/...]
-TRANSFORMS-06-drop = drop_events
-
-[source::/var/log/trino/*]
-TRANSFORMS-07-drop = drop_events
-
-[source::/var/log/amazon/...]
-TRANSFORMS-08-drop = drop_events
-
-[source::/var/log/dynatrace/...]
-TRANSFORMS-09-drop = drop_events
-
-[sourcetype::vmware-vm*]
-TRANSFORMS-10-drop = drop_events
-
-[sourcetype::oraasmaudit]
-TRANSFORMS-11-drop = drop_events
-
-[sourcetype::vmware-vg*]
-TRANSFORMS-12-drop = drop_events
-
-[source::/var/log/sssd/...]
-TRANSFORMS-13-drop = drop_events
-
-[source::/var/log/instance-state/...]
-TRANSFORMS-14-drop = drop_events
-
-[source::/var/log/dnf*]
-TRANSFORMS-15-drop = drop_events
-
-[sourcetype::EIL*]
-TRANSFORMS-16-drop = drop_events
-
-[source::/var/log/EIL*]
-TRANSFORMS-17-drop = drop_events
-
-[source::/var/log/tmp/...]
-TRANSFORMS-18-drop = drop_events
-
-[source::/var/log/rhsm/...]
-TRANSFORMS-19-drop = drop_events
-
-[source::/var/log/adfapi/...]
-TRANSFORMS-20-drop = drop_events
-
-[source::/var/log/hadoop-*/...]
-TRANSFORMS-21-drop = drop_events
-
-[source::/var/log/hdxapi/...]
-TRANSFORMS-22-drop = drop_events
-
-[source::/var/log/ecs/...]
-TRANSFORMS-23-drop = drop_events
-
-[source::/var/log/ebx/...]
-TRANSFORMS-24-drop = drop_events
-
-[source::/var/log/ecdw/...]
-TRANSFORMS-25-drop = drop_events
-
-[source::/var/log/rundeck/...]
-TRANSFORMS-26-drop = drop_events
-
-[source::/var/log/covapi/...]
-TRANSFORMS-27-drop = drop_events
-
-[source::/var/log/hive*/...]
-TRANSFORMS-28-drop = drop_events
-
-[source::/var/log/httpd/...]
-TRANSFORMS-29-drop = drop_events
-
-[sourcetype::launcher*]
-TRANSFORMS-30-drop = drop_events
-
-[sourcetype::jstack*]
-TRANSFORMS-31-drop = drop_events
-
-[sourcetype::logpusher*]
-TRANSFORMS-32-drop = drop_events
-
-[sourcetype::patch*]
-TRANSFORMS-33-drop = drop_events
-
-[sourcetype::patch_yum*]
-TRANSFORMS-34-drop = drop_events
-
-[sourcetype::server*]
-TRANSFORMS-35-drop = drop_events
-
-[sourcetype::supervisor*]
-TRANSFORMS-36-drop = drop_events
-
-[sourcetype::instance-state*]
-TRANSFORMS-37-drop = drop_events
-
-[sourcetype::instance-controller*]
-TRANSFORMS-38-drop = drop_events
-
-[source::/var/log/restore-runners*]
-TRANSFORMS-39-drop = drop_events
-
-[source::/var/log/casapi*]
-TRANSFORMS-40-drop = drop_events
-
-[source::/var/log/casnt*]
-TRANSFORMS-41-drop = drop_events
-
-[source::/var/log/cloud-init*]
-TRANSFORMS-42-drop = drop_events
-
-[source::/var/log/commvault*]
-TRANSFORMS-43-drop = drop_events
-
-[source::/var/log/hawkey.*]
-TRANSFORMS-47-drop = drop_events
-
-[source::/var/log/trino/server*]
-TRANSFORMS-48-drop = drop_events
-########################################################
-## GLOBAL PIPELINE (HF ENFORCEMENT)
-########################################################
-
-[*-too_small]
-TRANSFORMS-remove_too_small = remove_too_small_suffix
-
-[source::*]
-
-## 0 - normalize junk sourcetypes
-TRANSFORMS-00-normalize = fix_bad_sourcetype, remove_too_small_suffix
-
-## 1 - drop noisy sources (your wildcard problem fix)
-TRANSFORMS-02-drop-noise = drop_noisy_sources
-
-## 2 - enforce sourcetype + index
-TRANSFORMS-10-enforce = force_audit_sourcetype,force_audit_index,force_syslog_sourcetype,force_syslog_index,force_nginx_access_sourcetype,force_nginx_error_sourcetype,force_nginx_index,force_sudo_sourcetype,force_sudo_index
-
-## 3 - ensure index fallback
-TRANSFORMS-98-index_safety = force_generic_linux_index
-
-## 4 - debug (optional)
-TRANSFORMS-97-debug = debug_events
-
-## 5 - drop everything else (optional strict mode)
-# TRANSFORMS-99-drop = drop_events
+[diag_executor]
+RULESET-ruleset_diag_executor = _rule:ruleset_diag_executor:filter:regex:fp35mrle
