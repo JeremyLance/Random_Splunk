@@ -1,192 +1,246 @@
+[_rule:ruleset_amazon-ssm-agent-2:filter:regex:fupebzl4]
+INGEST_EVAL = queue=if(match(sourcetype, "amazon-ssm-agent-(too_small|\\d+)$"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-############################################################
-## DROP RULE (DISABLED BY DEFAULT FOR SAFETY)
-############################################################
-[drop_events]
-REGEX = .
-DEST_KEY = queue
-FORMAT = nullQueue
+[_rule:ruleset_cloud-init-output-3:filter:regex:fjbyca6c]
+INGEST_EVAL = queue=if(match(sourcetype, "cloud-init-output-(too_small|\\d+)$"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
+[_rule:ruleset_instance-state-too_small:filter:regex:fuvgx99n]
+INGEST_EVAL = queue=if(match(sourcetype, "instance-state-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-############################################################
-## DROP NOISY SOURCES (FIXED REGEX)
-############################################################
-[drop_noisy_sources]
-REGEX = ^/var/log/(amazon|aso|azure|commvault|candlepin|casrs|casapi|casnt|dynatrace|ecdw|ecs|foreman|hadoop.*|hdxapi|hive.*|instance-state|provision-node|redis|rhsm|rundeck|sssd|tmp|trino|vmware.*|vmware-*|cloud-init|dnf).*
-DEST_KEY = queue
-FORMAT = nullQueue
+[_rule:ruleset_instance-state-15:filter:regex:fmpnbue9]
+INGEST_EVAL = queue=if(match(sourcetype, "instance-state-15"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[drop_instance-state_sources]
-REGEX = ^/var/log/instance-state\*.log$
-DEST_KEY = queue
-FORMAT = nullQueue
+[_rule:ruleset_instance-state-10:filter:regex:fccizefy]
+INGEST_EVAL = queue=if(match(sourcetype, "instance-state-10"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[drop_trino_sources]
-REGEX = ^/var/log/trino\*.log$
-DEST_KEY = queue
-FORMAT = nullQueue
+[_rule:ruleset_jstack-too_small:filter:regex:fhxxvjsg]
+INGEST_EVAL = queue=if(match(sourcetype, "^jstack-(too_small|\\d+)$"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[drop_temp_sources]
-REGEX = ^/var/log/tmp\*.log$
-DEST_KEY = queue
-FORMAT = nullQueue
-############################################################
-## DEBUG ROUTING (OPTIONAL BUT VERY USEFUL)
-############################################################
-[debug_events]
-REGEX = .
-DEST_KEY = _MetaData:Index
-FORMAT = debug_linux_pipeline
+[_rule:ruleset_-too_small:filter:regex:too_small]
+INGEST_EVAL = queue=if(match(sourcetype, "-(too_small|\\d+)$"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-############################################################
-## GLOBAL SOURCETYPE NORMALIZATION
-############################################################
-[fix_bad_sourcetype]
-REGEX = ([-\s]+[^-\s]+_?)(?:-\d+-too_small.*-20\d{2}.*)?$
-DEST_KEY = MetaData:Sourcetype
-FORMAT = sourcetype::$1
+[_ruleset:global_settings]
+metrics.disabled = false
 
-############################################################
-## AUDIT LOGS
-############################################################
-[force_audit_sourcetype]
-REGEX = /var/log/audit/audit\.log(\.\d+)?
-DEST_KEY = MetaData:Sourcetype
-FORMAT = sourcetype::linux:audit
-WRITE_META = true
+[_rule:ruleset__opt_Quadient_InspireScaler_logs_server-too_small:filter:regex:fwmkxrp0]
+INGEST_EVAL = queue=if(match(sourcetype, "_Quadient_InspireScaler_logs_server-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[force_audit_index]
-REGEX = /var/log/audit/audit\.log(\.\d+)?
-DEST_KEY = _MetaData:Index
-FORMAT = sec_os_uhgid-000024
+[_rule:ruleset__var_log_amazon_ssm_amazon-ssm-agent-too_small:filter:regex:fb81vkt8]
+INGEST_EVAL = queue=if(match(sourcetype, "_var_log_amazon_ssm_amazon-ssm-agent-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-############################################################
-## SYSLOG FAMILY
-############################################################
-[force_syslog_sourcetype]
-REGEX = /var/log/(secure|messages|cron|syslog|kern\.log)(\.\d+)?
-DEST_KEY = MetaData:Sourcetype
-FORMAT = sourcetype::linux:syslog
-WRITE_META = true
+[_rule:ruleset__var_log_audit_audit-too_small:filter:regex:ffnqkmtz]
+INGEST_EVAL = queue=if(match(sourcetype, "_var_log_audit_audit-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[force_syslog_index]
-REGEX = /var/log/(secure|messages|cron|syslog|kern\.log)(\.\d+)?
-DEST_KEY = _MetaData:Index
-FORMAT = sec_os_uhgid-000024
+[_rule:ruleset__var_log_messages-too_small:filter:regex:ftxl9oay]
+INGEST_EVAL = queue=if(match(sourcetype, "_var_log_messages-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-############################################################
-## NGINX
-############################################################
-[force_nginx_access_sourcetype]
-REGEX = /var/log/nginx/access.*\.log$
-DEST_KEY = MetaData:Sourcetype
-FORMAT = sourcetype::access_combined
+[_rule:ruleset_access-too_small:filter:regex:fmjfgy3i]
+INGEST_EVAL = queue=if(match(sourcetype, "access-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[force_nginx_error_sourcetype]
-REGEX = /var/log/nginx/error.*\.log$
-DEST_KEY = MetaData:Sourcetype
-FORMAT = sourcetype::linux:syslog
+[_rule:ruleset_aide_log:filter:regex:fqyqcuuu]
+INGEST_EVAL = queue=if(match(sourcetype, "aide.log"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[force_nginx_index]
-REGEX = /var/log/nginx/(access|error).*\.log$
-DEST_KEY = _MetaData:Index
-FORMAT = sec_weblogs_uhgid-000024
+[_rule:ruleset_aide-2:filter:regex:fewj9enk]
+INGEST_EVAL = queue=if(match(sourcetype, "aide-2"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-############################################################
-## SUDO
-############################################################
-[force_sudo_sourcetype]
-REGEX = /var/log/sudo.*\.log$
-DEST_KEY = MetaData:Sourcetype
-FORMAT = sourcetype::linux:syslog
+[_rule:ruleset_aide-3:filter:regex:fxv1dk4q]
+INGEST_EVAL = queue=if(match(sourcetype, "aide-3"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[force_sudo_index]
-REGEX = /var/log/sudo.*\.log$
-DEST_KEY = _MetaData:Index
-FORMAT = sec_os_uhgid-000024
+[_rule:ruleset_aide-4:filter:regex:fjyfe14g]
+INGEST_EVAL = queue=if(match(sourcetype, "aide-4"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-############################################################
-## GENERIC FALLBACK (SAFE DEFAULT)
-############################################################
-[force_generic_linux_index]
-REGEX = /var/log/
-DEST_KEY = _MetaData:Index
-FORMAT = sec_os_uhgid-000024
+[_rule:ruleset_aide-6:filter:regex:f06xw5mw]
+INGEST_EVAL = queue=if(match(sourcetype, "aide-6"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-############################################################
-## FIELD EXTRACTIONS (FIXED REGEX)
-############################################################
+[_rule:ruleset_aide-too_small:filter:regex:fkdrx75w]
+INGEST_EVAL = queue=if(match(sourcetype, "aide-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[remove_too_small_suffix]
-REGEX = ^(.*)-too_small$
-DEST_KEY = MetaData:Sourcetype
-FORMAT = sourcetype::$1
+[_rule:ruleset_allwin:filter:regex:fa28y3nl]
+INGEST_EVAL = queue=if(match(sourcetype, "allwin"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
+[_rule:ruleset_boot:filter:regex:fy8gzn7r]
+INGEST_EVAL = queue=if(match(sourcetype, "boot"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[linux_syslog_header]
-REGEX = (?<syslog_time>\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(?<host>\S+)\s+(?<process>[^\[]+)\[(?<pid>\d+)\]:
+[_rule:ruleset_oneagent_latest_snapshot:filter:regex:f6t8xyws]
+INGEST_EVAL = queue=if(match(sourcetype, "oneagent_latest_snapshot"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[linux_audit_header]
-REGEX = type=(?<audit_type>\w+)\s+msg=audit\((?<audit_epoch>\d+)\.(?<audit_ms>\d+):(?<audit_id>\d+)\)
+[_rule:ruleset_logpusher-2:filter:regex:f4jbj3p6]
+INGEST_EVAL = queue=if(match(sourcetype, "logpusher-2"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[linux_aide_fields]
-REGEX = (?<aide_time>\d{2}-\d{2}-\d{4}\s+\d{2}:\d{2}:\d{2}\.\d{3}\s+[+-]\d{4})\s+(?<host>\w+)
+[_rule:ruleset_instance-state-3:filter:regex:f4h6dfm6]
+INGEST_EVAL = queue=if(match(sourcetype, "instance-state-3"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[linux_access_combined]
-REGEX = (?<client_ip>\S+)\s+\S+\s+\S+\s+\[(?<timestamp>[^\]]+)\]\s+"(?<method>\S+)\s+(?<uri>\S+)\s*(?<http_version>[^"]*)"\s+(?<status>\d+)\s+(?<bytes>\d+)
+[_rule:ruleset_secure_gateway_app_internal_log:filter:regex:fah0bhpb]
+INGEST_EVAL = queue=if(match(sourcetype, "secure_gateway_app_internal_log"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-############################################################
-## DROP RULE (DISABLED BY DEFAULT FOR SAFETY)
-############################################################
-[drop_events]
-REGEX = .
-DEST_KEY = queue
-FORMAT = nullQueue
+[_rule:ruleset_hadoop-yarn-resourcemanager-ip-10-157-116-74_healthcareit_net-too_small:filter:regex:f77v6qy3]
+INGEST_EVAL = queue=if(match(sourcetype, "hadoop-yarn-resourcemanager-ip-10-157-116-74.healthcareit.net-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
+[_rule:ruleset_node_sidecar_agent_manager_stdout:filter:regex:fjah27sq]
+INGEST_EVAL = queue=if(match(sourcetype, "node:sidecar:agent_manager:stdout"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-############################################################
-## DROP NOISY SOURCES (FIXED REGEX)
-############################################################
-[drop_noisy_sources]
-REGEX = ^/var/log/(amazon|aso|azure|commvault|candlepin|casrs|casapi|casnt|dynatrace|ecdw|ecs|foreman|hadoop.*|hdxapi|hive.*|instance-state|provision-node|redis|rhsm|rundeck|sssd|tmp|trino|vmware.*|vmware-*|cloud-init|dnf).*
-DEST_KEY = queue
-FORMAT = nullQueue
+[_rule:ruleset_node_sidecar_cmp_orchestrator:filter:regex:f9gw7ody]
+INGEST_EVAL = queue=if(match(sourcetype, "node:sidecar:cmp_orchestrator"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[drop_instance-state_sources]
-REGEX = ^/var/log/instance-state\*.log$
-DEST_KEY = queue
-FORMAT = nullQueue
+[_rule:ruleset_node_sidecar_cmp_orchestrator_stdout:filter:regex:f2rspzgn]
+INGEST_EVAL = queue=if(match(sourcetype, "node:sidecar:cmp_orchestrator:stdout"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[drop_trino_sources]
-REGEX = ^/var/log/trino\*.log$
-DEST_KEY = queue
-FORMAT = nullQueue
+[_rule:ruleset_node_sidecar_ipc_broker_stdout:filter:regex:fuw459wk]
+INGEST_EVAL = queue=if(match(sourcetype, "node:sidecar:ipc_broker:stdout"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[drop_temp_sources]
-REGEX = ^/var/log/tmp\*.log$
-DEST_KEY = queue
-FORMAT = nullQueue
-############################################################
-## DEBUG ROUTING (OPTIONAL BUT VERY USEFUL)
-############################################################
-[debug_events]
-REGEX = .
-DEST_KEY = _MetaData:Index
-FORMAT = debug_linux_pipeline
+[_rule:ruleset_node_sidecar_postgres_stderr:filter:regex:fgph1zll]
+INGEST_EVAL = queue=if(match(sourcetype, "node:sidecar:postgres:stderr"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-############################################################
-## GLOBAL SOURCETYPE NORMALIZATION
-############################################################
+[_rule:ruleset_puppet_core_set-too_small:filter:regex:fc46ijcl]
+INGEST_EVAL = queue=if(match(sourcetype, "puppet_core_set-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[remove_too_small_suffix]
-REGEX = ^(.*)-too_small$
-DEST_KEY = MetaData:Sourcetype
-FORMAT = sourcetype::$1
+[_rule:ruleset_audit-6:filter:regex:fr6zqc5v]
+INGEST_EVAL = queue=if(match(sourcetype, "audit-6"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
-[fix_bad_sourcetype]
-SOURCE_KEY = MetaData:Sourcetype
-REGEX = ^\s*(.+??)(?:-(?:too_small|\d+)).*$
-FORMAT = sourcetype::$1
-DEST_KEY = MetaData:Sourcetype
-WRITE_META = true
+[_rule:ruleset_microsoft_defender_enterprise_err-too_small:filter:regex:fokr57j5]
+INGEST_EVAL = queue=if(match(sourcetype, "microsoft_defender_enterprise_err-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
 
+[_rule:ruleset_microsoft_defender_core-too_small:filter:regex:f4nc8mu5]
+INGEST_EVAL = queue=if(match(sourcetype, "microsoft_defender_core-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_debug-too_small:filter:regex:fisbnf6i]
+INGEST_EVAL = queue=if(match(sourcetype, "debug-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_microsoft_defender_enterprise-too_small:filter:regex:ff1uxpwf]
+INGEST_EVAL = queue=if(match(sourcetype, "microsoft_defender_enterprise-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_cron-too_small:filter:regex:f2c1i4ut]
+INGEST_EVAL = queue=if(match(sourcetype, "cron-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_puppet_aux_set-too_small:filter:regex:ffi4nduf]
+INGEST_EVAL = queue=if(match(sourcetype, "puppet_aux_set-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset__opt_apigee_var_log_edge-message-processor_edge-message-processor-too_small:filter:regex:f40trwr4]
+INGEST_EVAL = queue=if(match(sourcetype, "_opt_apigee_var_log_edge-message-processor_edge-message-processor-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_error-too_small:filter:regex:f7d5dciw]
+INGEST_EVAL = queue=if(match(sourcetype, "error-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_veeva-user-data-too_small:filter:regex:fn40unx3]
+INGEST_EVAL = queue=if(match(sourcetype, "veeva-user-data-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_master-too_small:filter:regex:fdlchnot]
+INGEST_EVAL = queue=if(match(sourcetype, "master-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_setup-dns-too_small:filter:regex:f63ji1qr]
+INGEST_EVAL = queue=if(match(sourcetype, "setup-dns-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_mk-tmp-on-root-too_small:filter:regex:fxv5rhdo]
+INGEST_EVAL = queue=if(match(sourcetype, "mk-tmp-on-root-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_waagent-4:filter:regex:f8mvzzuy]
+INGEST_EVAL = queue=if(match(sourcetype, "waagent-4"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_platform-setup-too_small:filter:regex:faxillvm]
+INGEST_EVAL = queue=if(match(sourcetype, "platform-setup-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_waagent-3:filter:regex:fiu42ny6]
+INGEST_EVAL = queue=if(match(sourcetype, "waagent-3"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_copy_kyle_minus-2:filter:regex:fjar0wa8]
+INGEST_EVAL = queue=if(match(sourcetype, "copy_kyle_minus-2"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_error-8:filter:regex:fbcp1oah]
+INGEST_EVAL = queue=if(match(sourcetype, "error-8"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_microsoft_defender_core_err-too_small:filter:regex:f6moantf]
+INGEST_EVAL = queue=if(match(sourcetype, "microsoft_defender_core_err-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_sudo-too_small:filter:regex:faqajmtl]
+INGEST_EVAL = queue=if(match(sourcetype, "sudo-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_cloud-init-output-2:filter:regex:fa3x6bb0]
+INGEST_EVAL = queue=if(match(sourcetype, "cloud-init-output-2"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_CommandExecution-3:filter:regex:fhkfw34q]
+INGEST_EVAL = queue=if(match(sourcetype, "CommandExecution-3"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_CommandExecution-too_small:filter:regex:ffb102ot]
+INGEST_EVAL = queue=if(match(sourcetype, "CommandExecution-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_communication-2:filter:regex:f8s07s4k]
+INGEST_EVAL = queue=if(match(sourcetype, "communication-2"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_communication-too_small:filter:regex:fbc33q41]
+INGEST_EVAL = queue=if(match(sourcetype, "communication-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_console-too_small:filter:regex:fizbre01]
+INGEST_EVAL = queue=if(match(sourcetype, "console-too_small"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_dbx_server_connection_pool_metrics:filter:regex:fcffip3r]
+INGEST_EVAL = queue=if(match(sourcetype, "dbx_server_connection_pool_metrics"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_dbx_server_health_metrics:filter:regex:fmln1x3d]
+INGEST_EVAL = queue=if(match(sourcetype, "dbx_server_health_metrics"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_debug-21:filter:regex:f5frukmq]
+INGEST_EVAL = queue=if(match(sourcetype, "debug-21"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
+
+[_rule:ruleset_diag_executor:filter:regex:fp35mrle]
+INGEST_EVAL = queue=if(match(sourcetype, "diag_executor"), "nullQueue", queue)
+STOP_PROCESSING_IF = queue == "nullQueue"
