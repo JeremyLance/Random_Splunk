@@ -8,3 +8,12 @@
 
 [default]
 TRANSFORMS-drop_noisy_sourcetypes = ruleset_generic_suffix_drop, ruleset_literal_name_drop
+
+
+$SPLUNK_HOME/bin/splunk btool props list default --debug
+
+$SPLUNK_HOME/bin/splunk btool props list default --debug | grep -i transforms
+
+$SPLUNK_HOME/bin/splunk btool props list --debug | grep -B2 "^\[default\]"
+
+grep -rl "^\[default\]" $SPLUNK_HOME/etc/apps/*/local/props.conf $SPLUNK_HOME/etc/apps/*/default/props.conf 2>/dev/null
