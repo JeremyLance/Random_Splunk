@@ -1,4 +1,3 @@
-[linux_audit]
 SHOULD_LINEMERGE = false
 LINE_BREAKER = ([\r\n]+)
 TIME_PREFIX = msg=audit\(
@@ -84,6 +83,18 @@ TZ = UTC
 TRUNCATE = 10000
 TRANSFORMS-drop_noisy_sourcetypes = ruleset_generic_suffix_drop, ruleset_literal_name_drop, ruleset_host_drop
 
+[mcds_soap]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)\*?(?=SOAP (?:REQUEST RECEIVED|RESPONSE))
+TIME_PREFIX = TIME:\s+
+TIME_FORMAT = %d/%b/%Y:%H:%M:%S
+MAX_TIMESTAMP_LOOKAHEAD = 25
+TRUNCATE = 0
+SEDCMD-strip-stars = s/^\*+$//mg
+SEDCMD-remove_marker_lines = s/^[ \t]*\*[ \t]*\r?\n//g
+SEDCMD-strip-star-prefix = s/^\*+(SOAP (REQUEST RECEIVED|RESPONSE))/\1/mg
+TRANSFORMS-drop_empty_markers = mcds_soap_drop_empty_markers
+TRANSFORMS-drop_stars = mcds_soap_drop_stars
 [linux_aide]
 SHOULD_LINEMERGE = false
 LINE_BREAKER = ([\r\n]+)(?=Start timestamp:)
@@ -98,3 +109,8 @@ LINE_BREAKER = ([\r\n]+)(?=\w{3}\s+\d{1,2}\s\d{2}:\d{2}:\d{2}\s:)
 TIME_PREFIX = ^
 TIME_FORMAT = %b %e %H:%M:%S
 MAX_TIMESTAMP_LOOKAHEAD = 15
+
+[oneagent_latest_snapshot]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)
+TRANSFORMS-drop_noisy_sourcetypes = ruleset_generic_suffix_drop, ruleset_literal_name_drop
