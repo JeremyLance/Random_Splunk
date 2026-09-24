@@ -1,3 +1,4 @@
+[linux_audit]
 SHOULD_LINEMERGE = false
 LINE_BREAKER = ([\r\n]+)
 TIME_PREFIX = msg=audit\(
@@ -85,16 +86,26 @@ TRANSFORMS-drop_noisy_sourcetypes = ruleset_generic_suffix_drop, ruleset_literal
 
 [mcds_soap]
 SHOULD_LINEMERGE = false
+LINE_BREAKER = (\r?\n(?:\*?\r?\n){2,6})
+TIME_PREFIX = TIME:\s
+TIME_FORMAT = %d/%b/%Y:%H:%M:%S
+MAX_TIMESTAMP_LOOKAHEAD = 55
+TRUNCATE = 200000
+SEDCMD-strip_trailing_markers = s/[\r\n\*\s]+$//
+
+
+[mcds_soap]
+SHOULD_LINEMERGE = false
 LINE_BREAKER = ([\r\n]+)\*?(?=SOAP (?:REQUEST RECEIVED|RESPONSE))
 TIME_PREFIX = TIME:\s+
 TIME_FORMAT = %d/%b/%Y:%H:%M:%S
-MAX_TIMESTAMP_LOOKAHEAD = 25
+MAX_TIMESTAMP_LOOKAHEAD = 20
 TRUNCATE = 0
-SEDCMD-strip-stars = s/^\*+$//mg
-SEDCMD-remove_marker_lines = s/^[ \t]*\*[ \t]*\r?\n//g
-SEDCMD-strip-star-prefix = s/^\*+(SOAP (REQUEST RECEIVED|RESPONSE))/\1/mg
+SEDCMD-strip-stars = s/^\*+$//g
+SEDCMD-strip-star-prefix = s/^\*+(SOAP (REQUEST RECEIVED|RESPONSE))/\1/g
 TRANSFORMS-drop_empty_markers = mcds_soap_drop_empty_markers
-TRANSFORMS-drop_stars = mcds_soap_drop_stars
+
+
 [linux_aide]
 SHOULD_LINEMERGE = false
 LINE_BREAKER = ([\r\n]+)(?=Start timestamp:)
@@ -114,3 +125,59 @@ MAX_TIMESTAMP_LOOKAHEAD = 15
 SHOULD_LINEMERGE = false
 LINE_BREAKER = ([\r\n]+)
 TRANSFORMS-drop_noisy_sourcetypes = ruleset_generic_suffix_drop, ruleset_literal_name_drop
+
+#############################################################################
+# Ingest Actions - Drop noisy / too_small / low-value sourcetypes
+# Applied globally via [default] so it runs against every sourcetype that
+# hits this Heavy Forwarder, instead of requiring one stanza per sourcetype.
+# The actual sourcetype filtering happens inside the INGEST_EVAL regex in
+# transforms.txt, so no per-sourcetype binding is needed here at all.
+#############################################################################
+
+[default]
+TRANSFORMS-drop_noisy_sourcetypes = ruleset_generic_suffix_drop, ruleset_literal_name_drop
+
+[_var_log_amazon_ssm_amazon-ssm-agent-too_small]
+RULESET-ruleset__var_log_amazon_ssm_amazon-ssm-agent-too_small = _rule:ruleset__var_log_amazon_ssm_amazon-ssm-agent-too_small:filter:regex:fykf7e04
+
+[_var_log_audit_audit-too_small]
+RULESET-ruleset__var_log_audit_audit-too_small = _rule:ruleset__var_log_audit_audit-too_small:filter:regex:fmdewoio
+
+[_var_log_messages-too_small]
+RULESET-ruleset__var_log_messages-too_small = _rule:ruleset__var_log_messages-too_small:filter:regex:fwz6hcxy
+
+[oneagent_latest_snapshot]
+RULESET-ruleset_oneagent_latest_snapshot = _rule:ruleset_oneagent_latest_snapshot:filter:regex:f8an7d2a
+
+[scheduler]
+RULESET-ruleset_scheduler = _rule:ruleset_scheduler:filter:regex:fy7o37cp
+
+[logpusher-2]
+RULESET-ruleset_logpusher-2 = _rule:ruleset_logpusher-2:filter:regex:f10elh21
+
+[var-logs]
+RULESET-ruleset_var-logs = _rule:ruleset_var-logs:filter:regex:feyqzvr1
+
+# props.conf
+
+[source::/var/log/secure]
+TRANSFORMS-fix_sourcetype=st_linux_secure
+
+[source::/var/log/messages]
+TRANSFORMS-fix_sourcetype=st_syslog
+
+[source::/var/log/nginx/access.log]
+TRANSFORMS-fix_sourcetype=st_nginx_access
+
+[source::/var/log/cron]
+TRANSFORMS-fix_sourcetype=st_cron
+
+[sourcetype::var-logs]
+TRANSFORMS-drop_varlogs = drop_varlogs
+
+[source::/var/log/audit/audit.log]
+TRANSFORMS-fix_sourcetype=st_linux_audit
+
+[source::/var/log/sudo.log]
+TRANSFORMS-fix_sourcetype=st_linux_secure
+
