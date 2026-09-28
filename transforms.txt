@@ -8,9 +8,20 @@ REGEX = ^[\s*]+$
 DEST_KEY = queue
 FORMAT = nullQueue
 
+[mcds_soap_drop_stars]
+REGEX = ^\s*\*+\s*$
+DEST_KEY = queue
+FORMAT = nullQueue
+
+[mcds_soap_drop_binary]
+REGEX = ^[A-Za-z0-9+/=]{500,}$
+DEST_KEY = queue
+FORMAT = nullQueue
+
 [mcds_soap]
 SHOULD_LINEMERGE = false
 LINE_BREAKER = ([\r\n]+)\*?(?=SOAP (?:REQUEST RECEIVED|RESPONSE))
+LINE_BREAKER = ([\r\n]+(?:\s*\*\s*)*)(?=SOAP (?:REQUEST RECEIVED|RESPONSE))
 TIME_PREFIX = TIME:\s+
 TIME_FORMAT = %d/%b/%Y:%H:%M:%S
 MAX_TIMESTAMP_LOOKAHEAD = 128
@@ -19,3 +30,16 @@ SEDCMD-strip-stars = ^[\s*]+$
 SEDCMD-strip-star-prefix = s/^\*+(SOAP (REQUEST RECEIVED|RESPONSE))/\1/mg
 TRANSFORMS-drop_empty_markers = mcds_soap_drop_empty_markers
 TRANSFORMS-drop_stars = mcds_soap_drop_stars
+
+[mcds_soap]
+SHOULD_LINEMERGE = false
+LINE_BREAKER = ([\r\n]+)(?=SOAP (?:REQUEST RECEIVED|RESPONSE))
+LINE_BREAKER = ([\r\n]+(?:\s*\*\s*)*)(?=SOAP (?:REQUEST RECEIVED|RESPONSE))
+TIME_PREFIX = TIME:\s+
+TIME_FORMAT = %d/%b/%Y:%H:%M:%S
+MAX_TIMESTAMP_LOOKAHEAD = 128
+TRUNCATE = 0
+SEDCMD-strip-stars = s/^\s*\*\s*$//g
+SEDCMD-strip-stars = s/^\s*\*+\s*$//g
+SEDCMD-strip-stars = s/^\s*\*\s*$*/g
+TRANSFORMS-drop_stars = mcds_soap_drop_stars,mcds_soap_drop_binary
