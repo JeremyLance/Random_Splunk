@@ -2,6 +2,8 @@
 # ZZZ_syslog_cleanup
 # Drop known noisy infrastructure logs at HF
 #########################################################
+[default]
+TRANSFORMS-drop-noisy = zzz_drop_by_source
 
 [source::/var/log/cloud-init*]
 TRANSFORMS-null = zzz_drop_noisy_sources
