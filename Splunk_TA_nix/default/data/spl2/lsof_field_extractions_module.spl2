@@ -1,0 +1,103 @@
+/*
+SPL2 Content
+===============
+|---------------------|------------------------------------------------------------|
+| Template Version    | 0.1.0
+| Add-on Name         | Splunk Add-on for Unix and Linux
+| Version Compatible  | 10.3.1
+| Splunk-base-URL     | https://splunk.github.io/splunk-add-on-for-unix-and-linux/Releasenotes/
+| Sourcetype          | lsof
+|---------------------|------------------------------------------------------------|
+
+The template is created by reading props.conf and transforms.conf from an Add-on and converting them into an SPL2 pipeline. Its goal is to extract the same number of fields, with values matching those produced by the original props.conf and transforms.conf.
+
+To execute this template, make sure you have the following:
+    - Installed the compatible version of the Add-on in your Splunk Cloud Tenant.
+    - Confirm the availability of the lookup dataset
+        - Refresh the scpbridge connection by doing the following.
+        - Select the Settings icon and then select System connections.
+        - On the scpbridge connection, select the Refresh icon.
+    - If there are any KVstore lookups, make sure to populate those before using this template.
+
+Note: This template must not be used with Splunk Indexes; it is intended only for exporting to Data-lakes.
+*/
+
+
+
+/**
+ * Performs kv_mode based extractions.
+ * Currently only supports json with 1 level of nesting.
+ */
+function apply_kv_mode($source: dataset):dataset {
+    return | from $source
+}
+
+/*
+Performs regex-based field extractions on the source dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses, in order of execution:
+1. TRANSFORMS
+2. EXTRACT
+3. REPORT
+*/
+function apply_extractions($source: dataset):dataset {
+    return | from $source
+}
+
+/*
+Renames fields on the source dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses:
+1. FIELDALIAS
+*/
+function apply_normalizations($source: dataset):dataset {
+    return | from $source
+}
+
+/*
+Calculates expressions and puts the resulting value into respective fields on the source dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses:
+1. EVAL
+*/
+function apply_calculations_on_fields($source: dataset):dataset {
+    return | from $source
+}
+
+
+
+/*
+Enriches your source dataset with related information that is in a lookup dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses:
+1. LOOKUP
+*/
+function apply_lookups($source: dataset):dataset {
+    return | from $source
+
+
+}
+
+
+
+
+
+
+
+@annotation
+function field_extractions_predicates($predicate: any);
+export field_extractions_predicates
+
+@field_extractions_predicates(predicate:
+[{"field": "sourcetype", "operator": "EQUAL", "values": ["lsof"]}])
+function lsof_field_extractions_function($source: dataset):dataset {
+    return | from $source
+
+           | apply_kv_mode
+           | apply_extractions
+           | apply_normalizations
+           | apply_calculations_on_fields
+           | apply_lookups
+
+}
+export lsof_field_extractions_function
