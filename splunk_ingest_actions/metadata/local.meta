@@ -1,0 +1,4 @@
+[transforms/_ruleset%3Aglobal_settings]
+owner = splunk-system-user
+version = 10.4.2
+modtime = 1785576364.187977000
