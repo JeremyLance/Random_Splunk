@@ -1,0 +1,730 @@
+/*
+SPL2 Content
+===============
+|---------------------|------------------------------------------------------------|
+| Template Version    | 0.1.0
+| Add-on Name         | Splunk Add-on for Microsoft Windows
+| Version Compatible  | 10.1.1
+| Splunk-base-URL     | http://docs.splunk.com/Documentation/WindowsAddOn/latest/User/Releasenotes
+| Sourcetype          | WinEventLog
+|---------------------|------------------------------------------------------------|
+
+The template is created by reading props.conf and transforms.conf from an Add-on and converting them into an SPL2 module. Its goal is to extract the same number of fields, with values matching those produced by the original props.conf and transforms.conf.
+
+To execute this template, make sure you have the following:
+    - Installed the compatible version of the Add-on in your Splunk Cloud Tenant.
+    - Confirm the availability of the lookup dataset
+        - Refresh the scpbridge connection by doing the following.
+        - Select the Settings icon and then select System connections.
+        - On the scpbridge connection, select the Refresh icon.
+    - If there are any KVstore lookups, make sure to populate those before using this template.
+
+Note: This template must not be used with Splunk Indexes; it is intended only for exporting to Data-lakes.
+*/
+import windows_update_status_lookup from ~/../../lookups
+import windows_start_mode_lookup from ~/../../lookups
+import xmlsecurity_eventcode_errorcode_action_lookup from ~/../../lookups
+import windows_defender_severity_lookup from ~/../../lookups
+import windows_signature_lookup from ~/../../lookups
+import windows_severity_lookup from ~/../../lookups
+import windows_signature_lookup2 from ~/../../lookups
+import windows_reason_lookup from ~/../../lookups
+import windows_wineventlog_change_action_lookup from ~/../../lookups
+import windows_audit_changes_lookup from ~/../../lookups
+import windows_action_lookup from ~/../../lookups
+import windows_privilege_lookup from ~/../../lookups
+import windows_app_lookup from ~/../../lookups
+import MSADGroupType from ~/../../lookups
+import windows_endpoint_service_service_name_lookup from ~/../../lookups
+import windows_endpoint_service_service_type_lookup from ~/../../lookups
+import windows_endpoint_port_transport_lookup from ~/../../lookups
+import windows_wineventlog_change_object_fields_lookup from ~/../../lookups
+
+
+function WinEventLog_prep($source: dataset):dataset {
+    return | from $source
+           // auto kv mode
+
+           | eval tmp__raw = replace(_raw, /(?ms)^(\w+)=\s*([\s\S]*?)(?=\R\w+=|\Z)/, "##SEP##\\1##VAL_SEP##\\2##SEP##")
+| eval tmp__raw = filter(split(tmp__raw, "##SEP##"), $row -> match($row, /.*##VAL_SEP##.*/ ))
+| eval tmp__raw = map(tmp__raw, $row -> split($row, "##VAL_SEP##" ))
+| eval tmp__raw = reduce(tmp__raw, json_object(), ($acc, $row)-> if(isnull(json_extract($acc, replace(trim($row[0]), /\s/, "_"))), json_set($acc, replace(trim($row[0]), /\s/, "_"),trim($row[1], "\"\r\n ")), json_set($acc, replace(trim($row[0]), /\s/, "_"), if(isarray(json_extract($acc, replace(trim($row[0]), /\s/,"_"))), json_append(json_extract($acc, replace(trim($row[0]), /\s/,"_")), "",trim($row[1], "\"\r\n ")), json_array(json_extract($acc, replace(trim($row[0]), /\s/,"_")),trim($row[1], "\"\r\n "))))))
+| flatten tmp__raw
+| fields - tmp__raw
+
+
+           // regex based extractions
+
+           | rex field=Image_File_Name /^(?P<file_path>.*[\\\/]+)*(?P<file_name>.*)$/
+           | rex field=_raw /(?sm)\nMessage=(?<Message>.+)$/
+           | eval tmp_raw_User = User
+| eval tmp_raw_Type = Type
+| eval tmp_Message = replace(Message, /\n([^=\n\r\s]+)\s+\=\s+([^\n]*)/, "##SEP##\\1##VAL_SEP##\\2##SEP##")
+| eval tmp_Message = filter(split(tmp_Message, "##SEP##"), $row -> match($row, /.*##VAL_SEP##.*/ ))
+| eval tmp_Message = map(tmp_Message, $row -> split($row, "##VAL_SEP##" ))
+| eval tmp_Message = map(tmp_Message, $row -> json_array(replace(replace(trim($row[0]), /[^\w]/, "_"), /^_+/, ""), trim($row[1], "\r\n\t ")))
+| eval tmp_Message = filter(tmp_Message, $row -> $row[1] != "")
+| eval tmp_Message = reduce(tmp_Message, json_object(), ($acc, $row)-> if(isnull(json_extract($acc, $row[0])), json_set($acc, $row[0], $row[1]), json_set($acc, $row[0], if(isarray(json_extract($acc, $row[0])), json_append(json_extract($acc, $row[0]), "", $row[1]), json_array(json_extract($acc, $row[0]), $row[1])))))
+| eval tmp_Message_User = json_extract(tmp_Message, "User")
+| eval tmp_Message_Type = json_extract(tmp_Message, "Type")
+| flatten tmp_Message
+| eval User = if(isnotnull(tmp_raw_User) AND isnotnull(tmp_Message_User), if(isarray(tmp_Message_User), reduce(tmp_Message_User, json_array(tmp_raw_User), ($acc, $row)->json_append($acc, "", $row)), json_array(tmp_raw_User, tmp_Message_User)), User)
+| eval Type = if(isnotnull(tmp_raw_Type) AND isnotnull(tmp_Message_Type), if(isarray(tmp_Message_Type), reduce(tmp_Message_Type, json_array(tmp_raw_Type), ($acc, $row)->json_append($acc, "", $row)), json_array(tmp_raw_Type, tmp_Message_Type)), Type)
+| fields - tmp_Message, tmp_raw_User, tmp_raw_Type, tmp_Message_User, tmp_Message_Type
+
+           | eval tmp_raw_User = User
+| eval tmp_raw_Type = Type
+| eval tmp_Message = replace(Message, /\n([^:\n\r]+):[ \t]++([^\n]*)/, "##SEP##\\1##VAL_SEP##\\2##SEP##")
+| eval tmp_Message = filter(split(tmp_Message, "##SEP##"), $row -> match($row, /.*##VAL_SEP##.*/ ))
+| eval tmp_Message = map(tmp_Message, $row -> split($row, "##VAL_SEP##" ))
+| eval tmp_Message = map(tmp_Message, $row -> json_array(replace(replace(trim($row[0]), /[^\w]/, "_"), /^_+/, ""), trim($row[1], "\r\n\t ")))
+| eval tmp_Message = filter(tmp_Message, $row -> $row[1] != "")
+| eval tmp_Message = reduce(tmp_Message, json_object(), ($acc, $row)-> if(isnull(json_extract($acc, $row[0])), json_set($acc, $row[0], $row[1]), json_set($acc, $row[0], if(isarray(json_extract($acc, $row[0])), json_append(json_extract($acc, $row[0]), "", $row[1]), json_array(json_extract($acc, $row[0]), $row[1])))))
+| eval tmp_Message_User = json_extract(tmp_Message, "User")
+| eval tmp_Message_Type = json_extract(tmp_Message, "Type")
+| flatten tmp_Message
+| eval User = if(isnotnull(tmp_raw_User) AND isnotnull(tmp_Message_User), if(isarray(tmp_Message_User), reduce(tmp_Message_User, json_array(tmp_raw_User), ($acc, $row)->json_append($acc, "", $row)), json_array(tmp_raw_User, tmp_Message_User)), User)
+| eval Type = if(isnotnull(tmp_raw_Type) AND isnotnull(tmp_Message_Type), if(isarray(tmp_Message_Type), reduce(tmp_Message_Type, json_array(tmp_raw_Type), ($acc, $row)->json_append($acc, "", $row)), json_array(tmp_raw_Type, tmp_Message_Type)), Type)
+| fields - tmp_Message, tmp_raw_User, tmp_raw_Type, tmp_Message_User, tmp_Message_Type
+
+
+           // field alias based extractions
+
+           | eval category = TaskCategory
+           | eval dvc_nt_host = host
+           | eval dvc = ComputerName
+           | eval event_id = RecordNumber
+           | eval severity_id = EventType
+           | eval id = RecordNumber
+           | eval user_group_id = Primary_Group_ID
+           | eval service_id = Service_ID
+           | eval service = Service_Name
+           | eval service_name = Service_Name
+           | eval process = Process
+           | eval parent_process = Creator_Process_Name
+           | eval user_id = User_ID
+
+           // eval based extractions
+
+           | eval signature_id = if(SourceName="Microsoft-Windows-WindowsUpdateClient",signature_id,EventCode)
+           | eval process_name = if(EventCode==4688, New_Process_Name, if(Process_Name!="" AND Process_Name!="-", Process_Name, null))
+           | eval vendor_product = "Microsoft Windows"
+
+}
+function WinEventLog_Microsoft_Windows_PrintService_Operational($source: dataset):dataset {
+    return | from $source
+           // auto kv mode
+
+
+           // regex based extractions
+
+           | rex field=_raw /LogName=(?<app>\S+)\/[\s\S]*?User=(?<user>\S+)[\s\S]*?Message=(?<message>.*?)$/
+           | rex field=_raw /Document\s+(?P<print_job_ID>\d+),/
+           | rex field=_raw /Pages printed:\s+(?P<pages_printed>\d+)/
+           | rex field=_raw /owned by\s+(?<owner>\S+)/
+           | rex field=_raw /Document(?:\s+\d+)?\s*,\s+(?P<object>"[^"]+\.\w{2,4}"|\S+\.\w{2,4})/
+           | rex field=_raw /owned by \S+ on (?:\\\\)?(?<src>\S+)/
+           | rex field=_raw /was\s+printed\s+on\s+(?:Printer\s+)?(?<dest_name>[^()]+?)(?:\s+\([^)]+\))?(?=\s+(?:through|via)\s+port|\. )/
+           | rex field=_raw /(?:through|via)\s+port\s+(?:IP_)?(?<dest>(?:\d{1,3}\.){3}\d{1,3}|[0-9A-Fa-f:%]*:(?:\d{1,3}\.){3}\d{1,3}|[0-9A-Fa-f:%]*:[0-9A-Fa-f:%]+|[^\s.]+)(?=[\s.)]|$)/
+           | rex field=_raw /Size\s+in\s+bytes:\s+(?<bytes>\d+)/
+
+           // field alias based extractions
+
+
+           // eval based extractions
+
+           | eval vendor_product = "Microsoft-Windows-PrintService"
+           | eval object = replace(object, "^\"|\"$", "")
+           | eval object_attrs = mvjoin(mvappend( if(isnotnull(pages_printed), "pages printed=" + pages_printed, null), if(isnotnull(print_job_ID), "print job ID=" + print_job_ID, null) ), ", ")
+           // Workaround to remove null values from mv fields and display only a single value if length of mv field is one
+           | eval object_attrs = if(ismv(object_attrs), json_array_to_mv(filter(mv_to_json_array(object_attrs), $row-> isnotnull($row))), object_attrs)
+           | eval object_attrs = if(ismv(object_attrs) and mvcount(object_attrs) == 1, mvindex(object_attrs, 0), object_attrs)
+           | eval object_category = case(EventCode == 307, "Document", EventCode IN (800, 801, 805), "Diagnostic", EventCode == 842, "Driver", true, null)
+           | eval action = case(EventCode == 307, "shared", true, null)
+           | eval object_size = round(bytes / 1024, 2)
+           | eval dest_type = "printer"
+
+}
+function WinEventLog_System($source: dataset):dataset {
+    return | from $source
+           // auto kv mode
+
+
+           // regex based extractions
+
+           | eval source = coalesce(source, if(match(_raw, /SourceName\=IAS/), "WinEventLog:System:IAS", null))
+           | rex field=ComputerName /(?:[\\]+)?(?P<dest>[^-].*)/
+           | rex field=_raw /Installation Ready: The following updates are downloaded and ready for installation.*?:\s*(?P<signature_message>(?:.*[\r\n])*.*)/
+           | rex field=signature_message /-\s+(?P<signature>[^\r\n]+)/
+           | rex field=_raw /Windows successfully installed the following update:\s+(?P<signature>.*)/
+           | rex field=Message /(?P<signature>(?:The\s+time\s+provider\s+\w+\s+is\s+configured\s+to\s+acquire\s+time\s+from\s+one\s+or\s+more\s+time\s+sources\,\s+however\s+none\s+of\s+the\s+sources\s+are\s+currently\s+accessible)|(?:The\s+time\s+service\s+is\s+now\s+synchronizing\s+the\s+system\s+time\s+with\s+the\s+time\s+source)|(?:Time\s+Provider\s+\w+\:\s+An\s+error\s+occurred\s+during\s+DNS\s+lookup\s+of\s+the\s+manually\s+configured\s+peer))/
+           | rex field=signature /(?P<signature_id>KB\d+)/
+           | rex field=User /(?:[^\\]+\\)?(?P<user>.+)/
+           | rex field=_raw /Message\=User\s+(?:[^\/\\]+[\/\\])?(?P<user>[^.]+).*?was/
+           | rex field=Message /^The (?P<Service_Name>.*) service entered the (?P<status>.*) state\./
+           | rex field=Message /^The start type of the (?P<Service_Name>.*) service was changed from .* to (?P<start_type2>.*)\./
+           | rex field=UserData_Xml /(?ms)<updatelist(?:\s+[^>]+)?>(?P<signature_message>.*?)<\/updatelist>/
+           | rex field=UserData_Xml /(?ms)<updatetitle(?:\s+[^>]+)?>(?P<signature>.*?)<\/updatetitle>/
+           | rex field=_raw /<Computer>(?P<dest>[^<]+)<\/Computer>/
+           | eval tmp_raw_User = User
+| eval tmp_raw_Type = Type
+| eval tmp_Message = replace(Message, /\n([^=\n\r\s]+)\s+\=\s+([^\n]*)/, "##SEP##\\1##VAL_SEP##\\2##SEP##")
+| eval tmp_Message = filter(split(tmp_Message, "##SEP##"), $row -> match($row, /.*##VAL_SEP##.*/ ))
+| eval tmp_Message = map(tmp_Message, $row -> split($row, "##VAL_SEP##" ))
+| eval tmp_Message = map(tmp_Message, $row -> json_array(replace(replace(trim($row[0]), /[^\w]/, "_"), /^_+/, ""), trim($row[1], "\r\n\t ")))
+| eval tmp_Message = filter(tmp_Message, $row -> $row[1] != "")
+| eval tmp_Message = reduce(tmp_Message, json_object(), ($acc, $row)-> if(isnull(json_extract($acc, $row[0])), json_set($acc, $row[0], $row[1]), json_set($acc, $row[0], if(isarray(json_extract($acc, $row[0])), json_append(json_extract($acc, $row[0]), "", $row[1]), json_array(json_extract($acc, $row[0]), $row[1])))))
+| eval tmp_Message_User = json_extract(tmp_Message, "User")
+| eval tmp_Message_Type = json_extract(tmp_Message, "Type")
+| flatten tmp_Message
+| eval User = if(isnotnull(tmp_raw_User) AND isnotnull(tmp_Message_User), if(isarray(tmp_Message_User), reduce(tmp_Message_User, json_array(tmp_raw_User), ($acc, $row)->json_append($acc, "", $row)), json_array(tmp_raw_User, tmp_Message_User)), User)
+| eval Type = if(isnotnull(tmp_raw_Type) AND isnotnull(tmp_Message_Type), if(isarray(tmp_Message_Type), reduce(tmp_Message_Type, json_array(tmp_raw_Type), ($acc, $row)->json_append($acc, "", $row)), json_array(tmp_raw_Type, tmp_Message_Type)), Type)
+| fields - tmp_Message, tmp_raw_User, tmp_raw_Type, tmp_Message_User, tmp_Message_Type
+
+           | rex field=_raw /(?ms)EventCode=104(?:\n|\r).*(?:Message=The\s(?<object>.+)\sfile)/
+
+           // field alias based extractions
+
+           | eval body = signature_message
+           | eval body = Message
+           | eval package = signature_id
+           | eval package_title = signature
+           | eval signature = coalesce(signature, updateTitle)
+
+           // eval based extractions
+
+           | eval file_name = case(EventCode IN (17, 18), signature_message, EventCode == 19, signature, true, null)
+           | eval service_path = case(EventCode==7045,Service_File_Name)
+           | eval status = case(EventCode=="7036" AND status=="running","started",EventCode=="7036" AND status=="stopped","stopped",EventCode=="104","success",EventCode==7045,"installed")
+           | eval vendor = "Microsoft"
+           | eval product = "Windows"
+           | eval Error_Code = case(isnotnull(Status), Status, isnotnull(Error_Code), Error_Code, true, "-")
+           | eval user = case(EventCode==7040,case(user!="-",user),EventCode==7045,case(user!="-",if(user="NOT_TRANSLATED",Sid,user)),true,user)
+           | eval user_name = if(EventCode==104, User, user_name)
+           | eval result = if(EventCode==104, "log file was cleared", result)
+           | eval object_category = if(EventCode==104, "audit log", object_category)
+           | eval action = if(EventCode==104, "cleared", action)
+           | eval change_type = case(EventCode==104, "audit", true, change_type)
+           | eval app = if(SourceName="IAS","ias",null)
+
+}
+function WinEventLog_Microsoft_Windows_Windows_Defender_Operational($source: dataset):dataset {
+    return | from $source
+           // auto kv mode
+
+
+           // regex based extractions
+
+           | rex field=Path /^(?P<file_path>(?:.*[\\\/]+)*(?P<file_name>[^-].*))$/
+           | rex field=Message /For more information please see the following:\s*(?P<url>https?:\/\/[^\s]+)\s*Name:/
+           | rex field=_raw /User=(?P<user>[^\r\n]+)/
+           | rex field=_raw /^(?<date>\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2}(?:\.\d{3})?\s+(?:AM|PM))/
+
+           // field alias based extractions
+
+           | eval vendor_severity = Severity
+
+           // eval based extractions
+
+           | eval signature = Name
+           | eval dest = coalesce('ComputerName','Computer')
+           | eval category = coalesce(Category, category)
+           | eval vendor_product = case(SourceName="Microsoft-Windows-Windows Defender", "Microsoft Defender Antivirus", true, SourceName)
+           | eval signature_id = EventCode
+           | eval action = case( lower(Action) == "quarantine", "blocked", lower(Action) == "not applicable", "deferred", true, action)
+
+}
+function WinEventLog_Microsoft_Windows_PowerShell_Operational($source: dataset):dataset {
+    return | from $source
+           // auto kv mode
+
+
+           // regex based extractions
+
+           | rex field=ComputerName /(?:[\\]+)?(?P<dest>[^-].*)/
+
+           // field alias based extractions
+
+
+           // eval based extractions
+
+           | eval signature = case(EventCode==4103,"Microsoft-Windows-PowerShell Executing Pipeline",EventCode==4104,"Microsoft-Windows-PowerShell Execute a Remote Command")
+
+}
+function WinEventLog_Application($source: dataset):dataset {
+    return | from $source
+           // auto kv mode
+
+
+           // regex based extractions
+
+
+           // field alias based extractions
+
+
+           // eval based extractions
+
+           | eval dest = coalesce('ComputerName','Computer')
+           | eval Error_Code = case(isnotnull(Status), Status, isnotnull(Error_Code), Error_Code, true, "-")
+
+}
+function WinEventLog_Security($source: dataset):dataset {
+    return | from $source
+           // auto kv mode
+
+
+           // regex based extractions
+
+           | rex field=Message /(?ms)^\s*(?:Privileges|Assigned):\s+(?P<vendor_privilege>.*)/
+           | rex field=Message /(?ms)^\s*(?:Privileges|Assigned):?\s+(?P<vendor_privilege>.*?)(?:^[^:]+:)/
+           | rex field=vendor_privilege /^(?P<privilege_id>[^\r\n]+)/
+           | rex field=Token_Elevation_Type /^[^\d]+(?P<Token_Elevation_Type_id>\d+)/
+           | rex field=Caller_Logon_ID /(?P<session_id>.+)/
+           | rex field=Client_Logon_ID /(?P<session_id>.+)/
+           | rex field=Logon_ID /(?:(?:[^\n]+)\n)?(?P<session_id>.*)/
+           | rex field=ComputerName /(?:[\\]+)?(?P<dest>[^-].*)/
+           | rex field=Target_Server_Name /(?:[\\]+)?(?P<dest>[^-].*)/
+           | rex field=Target_Account_ID /(?P<dest_nt_domain>.+)[\\]/
+           | rex field=Supplied_Realm_Name /(?P<dest_nt_domain>.+)/
+           | rex field=Security_ID /(?P<dest_nt_domain>.+)[\\]/
+           | rex field=User_ID /(?P<dest_nt_domain>.+)[\\]/
+           | rex field=Domain /(?:(?:[^\n]+)\n)?(?P<dest_nt_domain>.+)/
+           | rex field=New_Domain /(?:(?:[^\n]+)\n)?(?P<dest_nt_domain>.+)/
+           | rex field=Account_Domain /(?:(?:[^\n]+)\n)?(?P<dest_nt_domain>.+)/
+           | rex field=Group_Domain /(?:(?:[^\n]+)\n)?(?P<dest_nt_domain>.+)/
+           | rex field=Primary_Domain /(?:(?:[^\n]+)\n)?(?P<dest_nt_domain>.+)/
+           | rex field=Target_Domain /(?:(?:[^\n]+)\n)?(?P<dest_nt_domain>.+)/
+           | rex field=ComputerName /(?:[\\]+)?(?P<dest_nt_host>[^-].*)/
+           | rex field=Target_Server_Name /(?:[\\]+)?(?P<dest_nt_host>[^-].*)/
+           | rex field=Client_Address /(?:[\\]+)?(?P<src>[^-].*)/
+           | rex field=Source_Network_Address /(?:[\\]+)?(?P<src>[^-].*)/
+           | rex field=Client_Machine_Name /(?:[\\]+)?(?P<src>[^-].*)/
+           | rex field=Caller_Machine_Name /(?:[\\]+)?(?P<src>[^-].*)/
+           | rex field=Workstation_Name /(?:[\\]+)?(?P<src>[^-].*)/
+           | rex field=Source_Workstation /(?:[\\]+)?(?P<src>[^-].*)/
+           | rex field=_raw /(?ms)(?:Subject)\s*:.*?Security\sID:[ \t]*(?P<src_subject_security_id>.*?)[\\|\n]/
+           | rex field=Client_Address /(?:[\\]+)?(?P<src_ip>[^-].*)/
+           | rex field=Source_Network_Address /(?:[\\]+)?(?P<src_ip>[^-].*)/
+           | rex field=Security_ID /(?!^-$)(?P<src_nt_domain>.+)[\\]/
+           | rex field=_raw /(?ms)(?:Subject|User|Account\sInformation)\s*:.*?Security\sID:[ \t]*(?P<src_nt_domain>.*?)[\\|\n]/
+           | rex field=Account_Domain /(?!^-$)(?P<src_nt_domain>[^\n]+)\n/
+           | rex field=Client_Domain /(?!^-$)(?P<src_nt_domain>.+)/
+           | rex field=Caller_Domain /(?!^-$)(?P<src_nt_domain>.+)/
+           | rex field=Caller_Computer_Name /(?:[\\]+)?(?P<src_nt_host>[^-].*)/
+           | rex field=Client_Machine_Name /(?:[\\]+)?(?P<src_nt_host>[^-].*)/
+           | rex field=Caller_Machine_Name /(?:[\\]+)?(?P<src_nt_host>[^-].*)/
+           | rex field=Workstation_Name /(?:[\\]+)?(?P<src_nt_host>[^-].*)/
+           | rex field=Source_Workstation /(?:[\\]+)?(?P<src_nt_host>[^-].*)/
+           | rex field=User_Name /(?!^-$)(?P<src_user>.+)/
+           | rex field=Account_Name /(?!^-$)(?P<src_user>[^\n]+)\n/
+           | rex field=Client_User_Name /(?!^-$)(?P<src_user>.+)/
+           | rex field=Caller_User_Name /(?!^-$)(?P<src_user>.+)/
+           | rex field=Security_ID /(?:[^\\]+\\)?(?P<user>.+)/
+           | rex field=User /(?:[^\\]+\\)?(?P<user>.+)/
+           | rex field=User_Name /(?P<user>.+)/
+           | rex field=Account_Name /(?:(?:[^\n]*)\n)?(?P<user>[^\n]*)/
+           | rex field=Account_Name /(?:(?:[^\n]*)\n)?(?:(?:CN|cn)=)?(?P<user>[^\n]*?),.*/
+           | rex field=New_Account_Name /(?P<user>.+)/
+           | rex field=Target_Account_Name /(?P<user>.+)/
+           | rex field=Primary_User_Name /(?P<user>.+)/
+           | rex field=Target_User_Name /(?P<user>.+)/
+           | rex field=Logon_account /(?:[^\\]+\\)?(?P<user>.+)/
+           | rex field=Logon_Account /(?:[^\\]+\\)?(?P<user>.+)/
+           | rex field=Security_ID /(?P<member_id>.+)/
+           | rex field=Member_ID /(?:[^\\]+\\)?(?P<member_id>.+)/
+           | rex field=Account_Name /(?P<member_dn>.+)/
+           | rex field=Member_Name /(?P<member_dn>.+)/
+           | rex field=Security_ID /(?P<member_nt_domain>[^\\]+\\)?(?:.+)/
+           | rex field=Member_ID /(?P<member_nt_domain>[^\\]+\\)?(?:.+)/
+           | rex field=Group_Type_Change /Security (?P<MSADGroupClassID>Enabled|Disabled) (?P<MSADGroupType>\w+) Group (?P<msad_action>Changed) to Security (?P<MSADNewGroupClassID>Enabled|Disabled) (?P<MSADNewGroupType>\w+) Group[:\.]/
+           | rex field=Change_Type /Security[ -](?P<MSADGroupClassID>[Ee]nabled|[Dd]isabled) (?P<MSADGroupType>\w+) Group Changed to Security[ -](?P<MSADNewGroupClassID>[Ee]nabled|[Dd]isabled) (?P<MSADNewGroupType>\w+) Group[.:]/
+           | rex field=Description /Security (?P<MSADGroupClassID>Enabled|Disabled) (?P<MSADGroupType>\w+) Group (?P<msad_action>.*?)[:\.]/
+           | rex field=_raw /(?ms)EventCode=(?P<msad_action>4781|4912)\s*\n.*Message=(?:.*?)[:\.]/
+           | rex field=_raw /(?ms).*An attempt was made to (?P<msad_action>.*?)[:\.]/
+           | rex field=_raw /(?ms).*A user account was (?P<msad_action>.*?)[:\.]/
+           | rex field=_raw /(?ms).*A computer account was (?P<msad_action>.*?)[:\.]/
+           | rex field=Description /User Account (?P<msad_action>.*?)[:\.]/
+           | rex field=Description /Computer Account (?P<msad_action>.*?)[:\.]/
+           | rex field=_raw /(?ms).*Policy Change Details:\s*\n(?P<MSADChangedAttributes>.*)/
+           | rex field=_raw /(?ms).*Category Settings:\s*\n(?P<MSADChangedAttributes>.*)/
+           | rex field=_raw /(?ms)EventCode=(?:624|645|4720|4741).*Attributes:\s*\n(?P<MSADChangedAttributes>.*)/
+           | rex field=_raw /(?ms).*Changed Attributes:\s*\n(?P<MSADChangedAttributes>.*)/
+           | rex field=_raw /(?ms).*Attributes:\s*\n(?P<MSADChangedAttributes>.*?)\s*\n\s*Additional Information:/
+           | rex field=_raw /(?ms).*Changed Attributes:\s*\n(?P<MSADChangedAttributes>.*?)\s*\n\s*Additional Information:/
+           | rex field=_raw /Subject:[\r\n]+(?:\s+Security\sID:(?<Subject_Security_ID>[^\r\n]*)[\r\n]*)?(?:\s+Account\sName:(?<Subject_Account_Name>[^\r\n]*)[\r\n]*)?(?:\s+Account\sDomain:(?<Subject_Account_Domain>[^\r\n]*)[\r\n]*)?(?:\s+Logon\sID:(?<Subject_Logon_ID>[^\r\n]*)[\r\n]*)?/
+           | rex field=_raw /Target\sAccount:[\r\n]+(?:\s+Security\sID:(?<Target_Security_ID>[^\r\n]*)[\r\n]*)?(?:\s+Account\sName:(?<Target_Account_Name>[^\r\n]*)[\r\n]*)?(?:\s+Account\sDomain:(?<Target_Account_Domain>[^\r\n]*)[\r\n]*)?(?:\s+Old\sAccount\sName:(?<Target_Old_Account_Name>[^\r\n]*)[\r\n]*)?(?:\s+New\sAccount\sName:(?<Target_New_Account_Name>[^\r\n]*)[\r\n]*)?(?:\s+Logon\sID:(?<Target_Logon_ID>[^\r\n]*)[\r\n]*)?/
+           | rex field=_raw /User:[\r\n]+(?:\s+Security\sID:(?<User_Security_ID>[^\r\n]*)[\r\n]*)?(?:\s+Account\sName:(?<User_Account_Name>[^\r\n]*)[\r\n]*)?(?:\s+Account\sDomain:(?<User_Account_Domain>[^\r\n]*)[\r\n]*)?/
+           | rex field=_raw /Group:[\r\n]+(?:\s+Security\sID:\s*(?<Group_Security_ID>[^\r\n]*)[\r\n]*)?(?:\s+(Group|Account)\sName:\s*(?<Group_Name>[^\r\n]*)[\r\n]*)?(?:\s+(Group|Account)\sDomain:\s*(?<Group_Domain>[^\r\n]*)[\r\n]*)?/
+           | rex field=_raw /New\sAccount:[\r\n]+(?:\s+Security\sID:(?<New_Account_Security_ID>[^\r\n]*)[\r\n]*)?(?:\s+Account\sName:(?<New_Account_Account_Name>[^\r\n]*)[\r\n]*)?(?:\s+Account\sDomain:(?<New_Account_Domain>[^\r\n]*)[\r\n]*)?/
+           | rex field=_raw /Member:[\r\n]+(?:\s+Security\sID:(?<Member_Security_ID>[^\r\n]*)[\r\n]*)?(?:\s+Account\sName:(?<Member_Account_Name>[^\r\n]*)[\r\n]*)?/
+           | rex field=_raw /Account\sThat\sWas\sLocked\sOut:[\r\n]+(?:\s+Security\sID:(?<Account_Locked_Out_Security_ID>[^\r\n]*)[\r\n]*)?(?:\s+Account\sName:(?<Account_Locked_Out_Name>[^\r\n]*)[\r\n]*)?/
+           | rex field=_raw /Task\sContent:(?<TaskContent>[\w\W]*<\/Task>)/
+           | rex field=_raw /Task\sNew\sContent:(?<TaskNewContent>[\w\W]*<\/Task>)/
+           | rex field=Process_Name /^.*\\(?<command>.*)$/
+           | rex field=_raw /(?ms)EventCode=4798(?:\n|\r).*User:\s*.*\n\s*Account\sName:\s*.*\n\s*Account\sDomain:\s*(?<dest>[^\n\r]+)/
+           | rex field=_raw /^(?<event_time>\d{2}\/\d{2}\/\d{4}\s+\d{2}:\d{2}:\d{2}(?:\.\d{3})?\s+(?:AM|PM))/
+           | rex field=_raw /(?ms)Network Information:.*?Destination Port:\s+(?<dest_port>\S+).*?(?:(?:\r*\n){2})/
+           | rex field=_raw /Rule Name:\s+(?<object_attrs>[^$]+)$/
+           | rex field=_raw /(?ms)Application Information:.*?Process Name:\s+(?<process>\S+).*?(?:(?:\r*\n){2})/
+           | rex field=_raw /(?ms)Application Information:.*?Process ID:\s+(?<process_id>\S+).*?(?:(?:\r*\n){2})/
+           | rex field=_raw /(?ms)Process Information:.*?Process ID:\s+(?<process_id>\S+).*?(?:(?:\r*\n){2})/
+           | rex field=_raw /(?ms)EventCode=4756(?:\n|\r).*Group:(?:\n|\r).*Security ID:\s*(?<Group_Domain>.*)\\(?<Group_Name>[^\n\r]+)/
+           | rex field=PrivilegeList /(?P<vendor_privilege>.+)/
+           | rex field=IpPort /(?P<Source_Port>.+)/
+           | rex field=TokenElevationType /(?P<Token_Elevation_Type>.+)/
+           | rex field=TargetServerName /(?P<Target_Server_Name>.+)/
+           | rex field=LogonType /(?P<Logon_Type>.+)/
+           | rex field=SubjectLogonId /(?P<Logon_ID>.+)/
+           | rex field=SubjectDomainName /(?P<Caller_Domain>.+)/
+           | rex field=TargetDomainName /(?P<Target_Domain>.+)/
+           | rex field=SubjectUserName /(?P<Caller_User_Name>.+)/
+           | rex field=TargetUserName /(?P<Target_User_Name>.+)/
+           | rex field=IpAddress /(?P<Source_Workstation>.+)/
+           | rex field=WorkstationName /(?P<Source_Workstation>.+)/
+           | rex field=Workstation /(?P<Source_Workstation>.+)/
+           | rex field=_raw /<Computer>(?P<dest>[^<]+)<\/Computer>/
+           | rex field=Target_Server_Name /(?:[\\]+)?(?P<dest>[^-].*)/
+           | rex field=_raw /<Data Name='DestPort'>(?<dest_port>[^<]+)<\/Data>/
+           | rex field=_raw /<Data Name='RuleName'>(?<object_attrs>[^<]+)<\/Data>/
+           | rex field=_raw /\<Data Name\=[}}\{\{'"]IpAddress['}}\{\{"]\>(?!\:\:1)(?!127\.0\.0\.1)(?<src_ip>[^\<]+)\<\/Data\>/
+           | rex field=_raw /<Data Name='ProcessName'>(?<process>[^<]+)<\/Data>/
+           | rex field=_raw /<Execution ProcessID='(?<process_id>\d+)'/
+           | rex field=_raw /(?ms)EventCode=(5156|5157)(?:\n|\r).*Application Name:\s*(?<app>[^\n\r]+)/
+           | rex field=_raw /(?ms)EventCode=(5156|5157)(?:\n|\r).*Destination Address:\s*(?<dest>(?<dest_ip>[^\n\r]+))/
+           | rex field=_raw /(?ms)EventCode=(5156|5157)(?:\n|\r).*Source Address:\s*(?<src>(?<src_ip>[^\n\r]+))/
+           | rex field=_raw /(?ms)EventCode=(5156|5157)(?:\n|\r).*Filter Run-Time ID:\s*(?<rule>[^\n\r]+)/
+           | rex field=_raw /(?ms)EventCode=(5156|5157)(?:\n|\r).*Remote User ID:\s*(?<user>[^\n\r]+)/
+           | rex field=Creator_Process_Name /(?:.*\\)?(?P<parent_process_name>.*)/
+           | rex field=New_Process_Name /(?:.*\\)?(?P<new_process_name>.*)/
+           | rex field=Target_Process_Name /(?:.*\\)?(?P<target_process_name>.*)/
+           | rex field=Process_Command_Line /(?P<process_command_line_process>^\"[^\"]+\"|[^\s]+)\s*(?P<process_command_line_arguments>.*)/
+           | rex field=Object_Name /^(?P<object_file_path>(?:.*[\\\/]+)*(?P<object_file_name>[^-].*))$/
+           | rex field=File_Path /^(?P<file_path>(?:.*[\\\/]+)*(?P<file_name>[^-].*))$/
+           | rex field=File_Name /^(?P<file_path>(?:.*[\\\/]+)*(?P<file_name>[^-].*))$/
+
+           // field alias based extractions
+
+           | eval src_port = Source_Port
+           | eval body = Message
+           | eval ta_windows_status = Status
+
+           // eval based extractions
+
+           | eval vendor = "Microsoft"
+           | eval product = "Windows"
+           | eval ta_windows_action = case(upper(Status) == "0XC000006F", "denied", upper(Status) == "0XC0000070", "denied", upper(Status) == "0XC000015B", "denied", upper(Status) == "0XC0000234", "denied", upper(Status) == "0XC0000064", "unknown", upper(Status) == "0XC0000133", "error", upper(Status) == "0XC0000225", "error", 1=1 , "failure")
+           | eval user_group = coalesce(Group_Name,New_Account_Name,Target_Account_Name)
+           | eval dest_nt_domain = if(dest_nt_domain == "-", null, dest_nt_domain)
+           | eval user = case(EventCode==4794,"DSRM administrator",EventCode IN (4799,5140),Subject_Account_Name,EventCode==4798,User_Account_Name,EventCode IN (4727,4730,4731,4734,4735,4737,4754,4755,4758,4764),null,EventCode==4688,if(user=="-" OR isnull(user),src_user,user),EventCode IN (4689,4696,4673,4674,4697),case(user!="-",user), EventCode IN (4703,4704,4705,4722,4723,4724,4725,4726,4738,4767), Target_Account_Name, EventCode==4781, Target_New_Account_Name, EventCode IN (4728,4729,4732,4733,4756,4757), if(like(Member_Security_ID, "%\\%"), mvindex(split(Member_Security_ID, "\\"),-1), if(like(user, "%\\%") OR user=="-", null, user)), true,user)
+           | eval user_name = case(EventCode==4798,User_Account_Name,EventCode IN (4703,4704,4705,4722,4723,4724,4725,4726,4738,4767), Target_Account_Name, EventCode==4781, Target_New_Account_Name, EventCode==4720, New_Account_Account_Name, EventCode==4740, Account_Locked_Out_Name, EventCode IN (1102,4634,4698,4700,4701,4702,4719,4799,4800,4801), Subject_Account_Name, EventCode==104, User, EventCode IN (4728,4729,4732,4733,4756,4757), if(like(Member_Security_ID, "%\\%"), mvindex(split(Member_Security_ID, "\\"),-1), if(like(user, "%\\%")OR user=="-", null, user)), true,user_name)
+           | eval src_user = case(EventCode IN (4634,4672,4703,4704,4705,4722,4723,4724,4725,4726,4727,4728,4729,4730,4731,4733,4734,4735,4737,4738,4754,4755,4756,4757,4758,4764,4767,4781,4794,4798,4800,4801), Subject_Account_Name, true,src_user)
+           | eval src_user_name = case(EventCode IN (4730,4727,4755,4754,4758,4764,4735,4737,4731,4734,4728,4729,4733,4756,4757,4634,4703,4704,4705,4720,4722,4723,4724,4725,4726,4732,4738,4740,4767,4781,4798,4800,4801), Subject_Account_Name, true,src_user_name)
+           | eval object = case(EventCode==4794,"DSRM administrator",EventCode==4798,User_Account_Name,EventCode IN (4727,4730,4731,4734,4735,4737,4750,4754,4755,4758,4764,4799,4744,4749,4759), Group_Name, EventCode IN (4703,4704,4705,4722,4723,4724,4725,4726,4738,4767), Target_Account_Name, EventCode==4781, Target_New_Account_Name, EventCode==4720, New_Account_Account_Name, EventCode==4740, Account_Locked_Out_Name, EventCode IN (4800,4801), ComputerName, EventCode==4634, Subject_Account_Name, EventCode IN (4698,4700,4701,4702), Task_Name, EventCode==1102, "audit log", EventCode==4719, "Windows Security Audit Policy", EventCode IN (4732,4729,4757,4756,4728,4733), if(like(Member_Security_ID, "%\\%"), mvindex(split(Member_Security_ID, "\\"),-1), if(like(user, "%\\%") OR user=="-", null, user)), EventCode==4876, "Certification Authorities Database", EventCode IN (4706, 4713), "Active Directory", true,object)
+           | eval object_id = case(EventCode==4798,User_Security_ID,EventCode IN (4728,4729,4733,4756,4757),Member_Security_ID, EventCode IN (4727,4730,4731,4734,4735,4737,4744,4749,4750,4754,4755,4758,4759,4764,4799), Group_Security_ID, EventCode IN (4703,4704,4705,4722,4723,4724,4725,4726,4738,4767,4781), Target_Security_ID, EventCode==4720, New_Account_Security_ID, EventCode==4732, Member_Security_ID, EventCode==4740, Account_Locked_Out_Security_ID, EventCode==4634, Subject_Security_ID, EventCode==4876, "Certification Authorities Database", true, object_id)
+           | eval authentication_method = case(EventCode IN (4624,4625), Logon_Type, true, authentication_method)
+           | eval authentication_service = case(EventCode IN (4624,4625), Authentication_Package, true, authentication_service)
+           | eval src_nt_domain = case(EventCode IN (4634,4672,4720,4727,4728,4729,4730,4731,4732,4733,4734,4735,4737,4740,4754,4755,4756,4757,4758,4764,4798,4800,4801), Subject_Account_Domain, true, src_nt_domain)
+           | eval src = case(EventCode==4794,Caller_Workstation,EventCode==4798,Subject_Account_Domain,EventCode IN (4729,4799,4730,4727,4755,4754,4758,4764,4735,4737,4731,4734,4757,4756,4728,4733,4876), ComputerName, EventCode IN (4672,4706,4713,4744,4749,4750,4759), src_subject_security_id, EventCode==5154, Source_Address, true, src)
+           | eval src_user_id = case(EventCode==4672, Subject_Security_ID, true, src_user_id)
+           | eval user_id = case(EventCode==4672, Subject_Security_ID, true, user_id)
+           | eval dest = if(EventCode==5154 AND NOT (Source_Address IN ("0.0.0.0", "::/0", "::")), Source_Address, dest)
+           | eval dest_port = if(EventCode==5154, Source_Port, dest_port)
+           | eval transport_dest_port = if(EventCode==5154, case(Protocol==1,"icmp",Protocol==6,"tcp",Protocol==17,"udp",Protocol==47,"gre",Protocol==51,"ah",Protocol==50,"esp",Protocol==8,"egp",Protocol==3,"ggp",Protocol==20,"hmp",Protocol==88,"igmp",Protocol==66,"rvd",Protocol==89,"ospf",Protocol==12,"pup",Protocol==27,"rdp",Protocol==46,"rsvp",true,"unknown") + "/" + tostring(Source_Port), transport_dest_port)
+           | eval state = if(EventCode==5154, "listening", state)
+           | eval creation_time = if(EventCode==5154, event_time, creation_time)
+           | eval Error_Code = case(isnotnull(Status), Status, isnotnull(Error_Code), Error_Code, true, "-")
+           | eval reason_id = case(EventCode==4625, Status, isnotnull(Status), Status, isnotnull(Error_Code), Error_Code, true, null)
+           | eval action = case(EventCode=="4688" AND Keywords=="Audit Success","allowed",EventCode=="4688" AND Keywords=="Audit Failure","blocked", EventCode==4672, if(isnull(action), "success", action))
+           | eval direction = lower(Direction)
+           | eval protocol_version = if(EventCode IN (5156,5157), if(isnull(dest_ip), null, if(match(coalesce(dest_ip, src_ip), ":"), "ipv6", "ipv4")), null)
+           | eval protocol = case(EventCode IN (5156,5157),if(Protocol==1,"icmp","ip"))
+           | eval registry_path = if(EventCode==4657 OR EventCode==4670,Object_Name,registry_path)
+           | eval registry_value_name = if(EventCode==4657, Object_Value_Name, registry_value_name)
+           | eval registry_value_type = if(EventCode==4657, New_Value_Type, registry_value_type)
+           | eval object_attrs = if(EventCode==4717 OR EventCode==4718,Access_Right,if(isnotnull(Group_Name) AND EventCode NOT IN (4727,4730,4731,4734,4735,4737,4744,4749,4750,4754,4755,4758,4759,4764,4799),Group_Name,if(EventCode IN (4698,4700,4701),TaskContent,if(EventCode==4702,TaskNewContent,if(EventCode==4719, "Category="+Category+",Subcategory="+Subcategory+",Subcategory GUID="+Subcategory_GUID+",Changes="+Changes,object_attrs)))))
+           | eval file_name = if(Object_Type=="File" AND isnotnull(object_file_name),object_file_name,if(isnotnull(Share_Name),Share_Name,file_name))
+           | eval file_path = if(Object_Type=="File" AND isnotnull(object_file_path),object_file_path,if(isnotnull(Share_Path),Share_Path,file_path))
+           | eval parent_process = case(EventCode==4696,Process_Name,true,parent_process)
+           | eval parent_process_id = case(EventCode==4688,Creator_Process_ID,EventCode==4696,Process_ID)
+           | eval process_path = case(EventCode==4688,New_Process_Name,EventCode==4696,Target_Process_Name,(EventCode==4689 OR EventCode==4674 OR EventCode==4673) AND Process_Name!="" AND Process_Name!="-",Process_Name)
+           | eval parent_process_path = case(EventCode==4688,Creator_Process_Name,EventCode==4696,Process_Name)
+           | eval process_id = case(EventCode==4696,Target_Process_ID, EventCode==4689 OR EventCode==4673, Process_ID, true, process_id)
+           | eval user_type = case(EventCode==4794, "administrator", EventCode IN (4741, 4742, 4743), "computer", EventCode==4713, "service account")
+
+}
+function WinEventLog_System_IAS($source: dataset):dataset {
+    return | from $source
+           // auto kv mode
+
+
+           // regex based extractions
+
+           | eval tmp_raw_User = User
+| eval tmp_raw_Type = Type
+| eval tmp_Message = replace(Message, /\n([^=\n\r\s]+)\s+\=\s+([^\n]*)/, "##SEP##\\1##VAL_SEP##\\2##SEP##")
+| eval tmp_Message = filter(split(tmp_Message, "##SEP##"), $row -> match($row, /.*##VAL_SEP##.*/ ))
+| eval tmp_Message = map(tmp_Message, $row -> split($row, "##VAL_SEP##" ))
+| eval tmp_Message = map(tmp_Message, $row -> json_array(replace(replace(trim($row[0]), /[^\w]/, "_"), /^_+/, ""), trim($row[1], "\r\n\t ")))
+| eval tmp_Message = filter(tmp_Message, $row -> $row[1] != "")
+| eval tmp_Message = reduce(tmp_Message, json_object(), ($acc, $row)-> if(isnull(json_extract($acc, $row[0])), json_set($acc, $row[0], $row[1]), json_set($acc, $row[0], if(isarray(json_extract($acc, $row[0])), json_append(json_extract($acc, $row[0]), "", $row[1]), json_array(json_extract($acc, $row[0]), $row[1])))))
+| eval tmp_Message_User = json_extract(tmp_Message, "User")
+| eval tmp_Message_Type = json_extract(tmp_Message, "Type")
+| flatten tmp_Message
+| eval User = if(isnotnull(tmp_raw_User) AND isnotnull(tmp_Message_User), if(isarray(tmp_Message_User), reduce(tmp_Message_User, json_array(tmp_raw_User), ($acc, $row)->json_append($acc, "", $row)), json_array(tmp_raw_User, tmp_Message_User)), User)
+| eval Type = if(isnotnull(tmp_raw_Type) AND isnotnull(tmp_Message_Type), if(isarray(tmp_Message_Type), reduce(tmp_Message_Type, json_array(tmp_raw_Type), ($acc, $row)->json_append($acc, "", $row)), json_array(tmp_raw_Type, tmp_Message_Type)), Type)
+| fields - tmp_Message, tmp_raw_User, tmp_raw_Type, tmp_Message_User, tmp_Message_Type
+
+
+           // field alias based extractions
+
+
+           // eval based extractions
+
+           | eval app = "ias"
+
+}
+function WinEventLog_ForwardedEvents($source: dataset):dataset {
+    return | from $source
+           // auto kv mode
+
+
+           // regex based extractions
+
+
+           // field alias based extractions
+
+
+           // eval based extractions
+
+
+}
+
+/*
+Enriches your source dataset with related information that is in a lookup dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses:
+1. LOOKUP
+*/
+function apply_WinEventLog_lookups($source: dataset):dataset {
+    return | from $source
+
+           // lookup extractions
+
+           | lookup windows_severity_lookup Type OUTPUTNEW severity
+           | lookup windows_signature_lookup signature_id OUTPUTNEW CategoryString, action, result
+           | lookup windows_signature_lookup signature_id OUTPUTNEW signature, signature AS name, signature AS subject
+
+           // default_lookup_extractions
+
+
+           // scripted_lookups
+
+}
+/*
+Enriches your source dataset with related information that is in a lookup dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses:
+1. LOOKUP
+*/
+function apply_WinEventLog_System_lookups($source: dataset):dataset {
+    return | from $source
+
+           // lookup extractions
+
+           | lookup windows_start_mode_lookup StartType AS start_type2 OUTPUTNEW start_mode
+           | lookup windows_start_mode_lookup StartType AS Service_Start_Type OUTPUTNEW start_mode
+           | lookup xmlsecurity_eventcode_errorcode_action_lookup EventCode, Error_Code OUTPUTNEW action, action AS status
+           | lookup windows_update_status_lookup EventCode OUTPUTNEW status
+
+           // default_lookup_extractions
+
+
+           // scripted_lookups
+
+}
+/*
+Enriches your source dataset with related information that is in a lookup dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses:
+1. LOOKUP
+*/
+function apply_WinEventLog_Microsoft_Windows_Windows_Defender_Operational_lookups($source: dataset):dataset {
+    return | from $source
+
+           // lookup extractions
+
+           | lookup windows_defender_severity_lookup vendor_severity OUTPUTNEW severity
+
+           // default_lookup_extractions
+
+
+           // scripted_lookups
+
+}
+/*
+Enriches your source dataset with related information that is in a lookup dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses:
+1. LOOKUP
+*/
+function apply_WinEventLog_Application_lookups($source: dataset):dataset {
+    return | from $source
+
+           // lookup extractions
+
+           | lookup xmlsecurity_eventcode_errorcode_action_lookup EventCode, Error_Code OUTPUTNEW action, action AS status
+
+           // default_lookup_extractions
+
+
+           // scripted_lookups
+
+}
+/*
+Enriches your source dataset with related information that is in a lookup dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses:
+1. LOOKUP
+*/
+function apply_WinEventLog_Security_lookups($source: dataset):dataset {
+    return | from $source
+
+           // lookup extractions
+
+           | lookup windows_severity_lookup EventCode OUTPUTNEW severity
+           | lookup windows_signature_lookup signature_id OUTPUTNEW CategoryString AS ta_windows_security_CategoryString, command
+           | lookup windows_wineventlog_change_action_lookup EventCode OUTPUTNEW action, status
+           | lookup windows_audit_changes_lookup EventCode OUTPUTNEW action, change_type, object_category
+           | lookup windows_action_lookup Type OUTPUTNEW action, action AS status
+           | lookup windows_action_lookup Type AS Keywords OUTPUTNEW action, action AS status
+           | lookup xmlsecurity_eventcode_errorcode_action_lookup EventCode, Error_Code OUTPUTNEW action, action AS status
+           | lookup windows_app_lookup EventCode OUTPUTNEW app
+           | lookup windows_app_lookup Source_Network_Address OUTPUTNEW app
+           | lookup windows_app_lookup Target_Server_Name OUTPUTNEW app
+           | lookup windows_app_lookup Logon_Type OUTPUTNEW app
+           | lookup windows_app_lookup source OUTPUTNEW app
+           | lookup MSADGroupType MSADGroupClassID OUTPUTNEW MSADGroupClass
+           | lookup windows_privilege_lookup privilege_id OUTPUT privilege
+           | lookup windows_reason_lookup signature_id, Status, Sub_Status OUTPUT reason
+           | lookup windows_endpoint_service_service_name_lookup EventCode OUTPUTNEW service, service_name
+           | lookup windows_endpoint_service_service_type_lookup Service_Start_Type OUTPUTNEW start_mode
+           | lookup windows_signature_lookup2 signature_id, Sub_Status OUTPUTNEW signature, signature AS name, signature AS subject, signature AS reason
+           | lookup windows_signature_lookup2 signature_id, Status OUTPUTNEW signature AS reason
+           | lookup windows_endpoint_port_transport_lookup Protocol OUTPUTNEW transport
+           | lookup windows_wineventlog_change_object_fields_lookup EventCode OUTPUTNEW change_type, object_attrs, object_category, result
+
+           // default_lookup_extractions
+
+
+           // scripted_lookups
+
+}
+
+
+
+
+
+
+
+@annotation
+function field_extractions_predicates($predicate: any);
+export field_extractions_predicates
+
+@field_extractions_predicates(predicate:
+[
+  {"field": "sourcetype", "operator": "EQUAL", "values": ["WinEventLog"]},
+  {"field": "source", "operator": "EQUAL", "values": ["WinEventLog:Microsoft-Windows-PrintService/Operational"]}
+])
+function WinEventLog_Microsoft_Windows_PrintService_Operational_field_extractions_function($source: dataset):dataset {
+    return | from $source
+            | WinEventLog_prep | WinEventLog_Microsoft_Windows_PrintService_Operational | apply_WinEventLog_lookups
+}
+
+@field_extractions_predicates(predicate:
+[
+  {"field": "sourcetype", "operator": "EQUAL", "values": ["WinEventLog"]},
+  {"field": "source", "operator": "EQUAL", "values": ["WinEventLog:System"]}
+])
+function WinEventLog_System_field_extractions_function($source: dataset):dataset {
+    return | from $source
+            | WinEventLog_prep | WinEventLog_System | apply_WinEventLog_System_lookups | apply_WinEventLog_lookups
+}
+
+@field_extractions_predicates(predicate:
+[
+  {"field": "sourcetype", "operator": "EQUAL", "values": ["WinEventLog"]},
+  {"field": "source", "operator": "EQUAL", "values": ["WinEventLog:Microsoft-Windows-Windows Defender/Operational"]}
+])
+function WinEventLog_Microsoft_Windows_Windows_Defender_Operational_field_extractions_function($source: dataset):dataset {
+    return | from $source
+            | WinEventLog_prep | WinEventLog_Microsoft_Windows_Windows_Defender_Operational | apply_WinEventLog_Microsoft_Windows_Windows_Defender_Operational_lookups | apply_WinEventLog_lookups
+}
+
+@field_extractions_predicates(predicate:
+[
+  {"field": "sourcetype", "operator": "EQUAL", "values": ["WinEventLog"]},
+  {"field": "source", "operator": "EQUAL", "values": ["WinEventLog:Microsoft-Windows-PowerShell/Operational"]}
+])
+function WinEventLog_Microsoft_Windows_PowerShell_Operational_field_extractions_function($source: dataset):dataset {
+    return | from $source
+            | WinEventLog_prep | WinEventLog_Microsoft_Windows_PowerShell_Operational | apply_WinEventLog_lookups
+}
+
+@field_extractions_predicates(predicate:
+[
+  {"field": "sourcetype", "operator": "EQUAL", "values": ["WinEventLog"]},
+  {"field": "source", "operator": "EQUAL", "values": ["WinEventLog:Application"]}
+])
+function WinEventLog_Application_field_extractions_function($source: dataset):dataset {
+    return | from $source
+            | WinEventLog_prep | WinEventLog_Application | apply_WinEventLog_Application_lookups | apply_WinEventLog_lookups
+}
+
+@field_extractions_predicates(predicate:
+[
+  {"field": "sourcetype", "operator": "EQUAL", "values": ["WinEventLog"]},
+  {"field": "source", "operator": "EQUAL", "values": ["WinEventLog:Security"]}
+])
+function WinEventLog_Security_field_extractions_function($source: dataset):dataset {
+    return | from $source
+            | WinEventLog_prep | WinEventLog_Security | apply_WinEventLog_Security_lookups | apply_WinEventLog_lookups
+}
+
+@field_extractions_predicates(predicate:
+[
+  {"field": "sourcetype", "operator": "EQUAL", "values": ["WinEventLog"]},
+  {"field": "source", "operator": "EQUAL", "values": ["WinEventLog:System:IAS"]}
+])
+function WinEventLog_System_IAS_field_extractions_function($source: dataset):dataset {
+    return | from $source
+            | WinEventLog_prep | WinEventLog_System_IAS | apply_WinEventLog_lookups
+}
+
+@field_extractions_predicates(predicate:
+[
+  {"field": "sourcetype", "operator": "EQUAL", "values": ["WinEventLog"]},
+  {"field": "source", "operator": "EQUAL", "values": ["WinEventLog:ForwardedEvents"]}
+])
+function WinEventLog_ForwardedEvents_field_extractions_function($source: dataset):dataset {
+    return | from $source
+            | WinEventLog_prep | WinEventLog_ForwardedEvents | apply_WinEventLog_lookups
+}
+
+@field_extractions_predicates(predicate:
+[
+  {"field": "sourcetype", "operator": "EQUAL", "values": ["WinEventLog"]}
+])
+function WinEventLog_field_extractions_function($source: dataset):dataset {
+    return | from $source
+            | WinEventLog_prep | apply_WinEventLog_lookups
+}
+
+export WinEventLog_Application_field_extractions_function
+export WinEventLog_ForwardedEvents_field_extractions_function
+export WinEventLog_Microsoft_Windows_PowerShell_Operational_field_extractions_function
+export WinEventLog_Microsoft_Windows_PrintService_Operational_field_extractions_function
+export WinEventLog_Microsoft_Windows_Windows_Defender_Operational_field_extractions_function
+export WinEventLog_Security_field_extractions_function
+export WinEventLog_System_IAS_field_extractions_function
+export WinEventLog_System_field_extractions_function
+export WinEventLog_field_extractions_function

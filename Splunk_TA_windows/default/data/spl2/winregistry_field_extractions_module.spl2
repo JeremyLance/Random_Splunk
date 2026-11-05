@@ -1,0 +1,131 @@
+/*
+SPL2 Content
+===============
+|---------------------|------------------------------------------------------------|
+| Template Version    | 0.1.0
+| Add-on Name         | Splunk Add-on for Microsoft Windows
+| Version Compatible  | 10.1.1
+| Splunk-base-URL     | http://docs.splunk.com/Documentation/WindowsAddOn/latest/User/Releasenotes
+| Sourcetype          | WinRegistry
+|---------------------|------------------------------------------------------------|
+
+The template is created by reading props.conf and transforms.conf from an Add-on and converting them into an SPL2 pipeline. Its goal is to extract the same number of fields, with values matching those produced by the original props.conf and transforms.conf.
+
+To execute this template, make sure you have the following:
+    - Installed the compatible version of the Add-on in your Splunk Cloud Tenant.
+    - Confirm the availability of the lookup dataset
+        - Refresh the scpbridge connection by doing the following.
+        - Select the Settings icon and then select System connections.
+        - On the scpbridge connection, select the Refresh icon.
+    - If there are any KVstore lookups, make sure to populate those before using this template.
+
+Note: This template must not be used with Splunk Indexes; it is intended only for exporting to Data-lakes.
+*/
+import endpoint_change_vendor_action_lookup from ~/../../lookups
+import endpoint_change_object_category_lookup from ~/../../lookups
+import endpoint_change_status_lookup from ~/../../lookups
+import endpoint_change_user_type_lookup from ~/../../lookups
+
+
+/**
+ * Performs kv_mode based extractions.
+ * Currently only supports json with 1 level of nesting.
+ */
+function apply_kv_mode($source: dataset):dataset {
+    return | from $source
+           | eval tmp__raw = replace(_raw, /(?ms)^(\w+)=\s*([\s\S]*?)(?=\R\w+=|\Z)/, "##SEP##\\1##VAL_SEP##\\2##SEP##")
+| eval tmp__raw = filter(split(tmp__raw, "##SEP##"), $row -> match($row, /.*##VAL_SEP##.*/ ))
+| eval tmp__raw = map(tmp__raw, $row -> split($row, "##VAL_SEP##" ))
+| eval tmp__raw = reduce(tmp__raw, json_object(), ($acc, $row)-> if(isnull(json_extract($acc, replace(trim($row[0]), /\s/, "_"))), json_set($acc, replace(trim($row[0]), /\s/, "_"),trim($row[1], "\"\r\n ")), json_set($acc, replace(trim($row[0]), /\s/, "_"), if(isarray(json_extract($acc, replace(trim($row[0]), /\s/,"_"))), json_append(json_extract($acc, replace(trim($row[0]), /\s/,"_")), "",trim($row[1], "\"\r\n ")), json_array(json_extract($acc, replace(trim($row[0]), /\s/,"_")),trim($row[1], "\"\r\n "))))))
+| flatten tmp__raw
+| fields - tmp__raw
+
+}
+
+/*
+Performs regex-based field extractions on the source dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses, in order of execution:
+1. TRANSFORMS
+2. EXTRACT
+3. REPORT
+*/
+function apply_extractions($source: dataset):dataset {
+    return | from $source
+           | rex field=_raw /registry_type="\w+Key"[\r\n]+key_path="(?P<registry_path>(?:.*)\\([^"]+))/
+           | rex field=_raw /registry_type="\w+Value"[\r\n]+key_path="(?P<registry_path>(?:.*)\\(.*?))\\([^"]+)/
+           | rex field=_raw /data="(?P<registry_value_data>[^"]+)"/
+           | rex field=_raw /registry_type="\w+Value"[\r\n]+key_path="(?P<object_path>(?:.*)\\(?:.*?))\\([^"]+)/
+           | rex field=_raw /registry_type="\w+Key"[\r\n]+key_path="(?P<object_path>(?:.*)\\([^"]+))/
+           | rex field=_raw /event_status="\((?P<vendor_status>[0-9-]+)\)(?P<msg>[^\"]+)"/
+           | rex field=_raw /process_image=\"(?:[^\"]+)\\([^\"]+)\"/
+}
+
+/*
+Renames fields on the source dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses:
+1. FIELDALIAS
+*/
+function apply_normalizations($source: dataset):dataset {
+    return | from $source
+           | eval registry_value_type = data_type
+           | eval vendor_action = registry_type
+           | eval dest = host
+           | eval src = host
+           | eval process_id = pid
+}
+
+/*
+Calculates expressions and puts the resulting value into respective fields on the source dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses:
+1. EVAL
+*/
+function apply_calculations_on_fields($source: dataset):dataset {
+    return | from $source
+           | eval vendor_product = "Microsoft Windows"
+}
+
+
+
+/*
+Enriches your source dataset with related information that is in a lookup dataset.
+
+This function emulates the behavior of the following Props & Transforms clauses:
+1. LOOKUP
+*/
+function apply_lookups($source: dataset):dataset {
+    return | from $source
+           | lookup endpoint_change_vendor_action_lookup vendor_action OUTPUT action
+           | lookup endpoint_change_object_category_lookup object AS sourcetype OUTPUT object_category
+           | lookup endpoint_change_status_lookup vendor_status OUTPUT status
+           | lookup endpoint_change_user_type_lookup sourcetype OUTPUT user_type
+
+           | eval status = if(isnotnull(vendor_status), coalesce(status, "failure"), status)
+
+}
+
+
+
+
+
+
+
+@annotation
+function field_extractions_predicates($predicate: any);
+export field_extractions_predicates
+
+@field_extractions_predicates(predicate:
+[{"field": "sourcetype", "operator": "EQUAL", "values": ["WinRegistry"]}])
+function WinRegistry_field_extractions_function($source: dataset):dataset {
+    return | from $source
+
+           | apply_kv_mode
+           | apply_extractions
+           | apply_normalizations
+           | apply_calculations_on_fields
+           | apply_lookups
+
+}
+export WinRegistry_field_extractions_function
